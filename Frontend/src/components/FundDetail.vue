@@ -5,47 +5,38 @@
     
     <!-- 主要内容区域 -->
     <div v-if="fundDetail" class="detail-content">
-      <!-- 净值走势图 -->
-      <FundChart
-        :netWorthTrend="processedNetWorthTrend"
-        :acWorthTrend="processedAcWorthTrend"
-      />
       
-      <!-- 详细信息展示 -->
+      <!-- 中心区域：图表展示 -->
+      <div class="charts-section">
+        <!-- 净值走势图 -->
+        <FundChart
+          :netWorthTrend="processedNetWorthTrend"
+          :acWorthTrend="processedAcWorthTrend"
+        />
+        
+        <!-- 累计收益率对比图 -->
+        <FundPerformanceComparison
+          :grandTotal="fundDetail.grand_total"
+        />
+        
+        <!-- 同类排名走势 -->
+        <FundRankingTrend
+          :rateInSimilarType="fundDetail.rate_in_similar_type"
+          :rateInSimilarPercent="fundDetail.rate_in_similar_percent"
+        />
+      </div>
+      
+      <!-- 详细信息区域 -->
       <div class="detail-sections">
-        <!-- 持仓股票信息 -->
-        <div class="section">
-          <h3>持仓股票</h3>
-          <div v-if="fundDetail.stock_codes && fundDetail.stock_codes.length > 0" class="stock-list">
-            <span v-for="(stock, index) in fundDetail.stock_codes.slice(0, 10)" :key="index" class="stock-tag">
-              {{ stock }}
-            </span>
-            <div v-if="fundDetail.stock_codes.length > 10" class="more-stocks">
-              等 {{ fundDetail.stock_codes.length }} 只股票
-            </div>
-          </div>
-          <div v-else class="no-data">暂无持仓数据</div>
-        </div>
+        <!-- 资产配置 -->
+        <FundAssetAllocation
+          :assetAllocation="fundDetail.asset_allocation"
+        />
         
-        <!-- 基础信息展示 -->
-        <div class="section">
-          <h3>基金基础信息</h3>
-          <div v-if="fundDetail.basic_info" class="basic-info-grid">
-            <template v-for="(value, key) in fundDetail.basic_info" :key="key">
-              <div class="info-row" v-if="filterBasicInfo(key, value)">
-                <span class="info-label">{{ formatKey(key) }}:</span>
-                <span class="info-value">{{ value || '--' }}</span>
-              </div>
-            </template>
-          </div>
-          <div v-else class="no-data">暂无基础信息</div>
-        </div>
-        
-        <!-- 原始数据展示（调试用） -->
-        <div class="section" v-if="showRawData">
-          <h3>原始数据</h3>
-          <pre class="json-data">{{ JSON.stringify(fundDetail, null, 2) }}</pre>
-        </div>
+        <!-- 基金规模变动 -->
+        <FundScaleChange
+          :fluctuationScale="fundDetail.fluctuation_scale"
+        />
       </div>
     </div>
     
@@ -74,13 +65,21 @@
 import { ref, watch, computed } from 'vue'
 import FundBasicInfo from './FundBasicInfo.vue'
 import FundChart from './FundChart.vue'
+import FundPerformanceComparison from './FundPerformanceComparison.vue'
+import FundRankingTrend from './FundRankingTrend.vue'
+import FundAssetAllocation from './FundAssetAllocation.vue'
+import FundScaleChange from './FundScaleChange.vue'
 import { fundAPI } from '../services/api'
 
 export default {
   name: 'FundDetail',
   components: {
     FundBasicInfo,
-    FundChart
+    FundChart,
+    FundPerformanceComparison,
+    FundRankingTrend,
+    FundAssetAllocation,
+    FundScaleChange
   },
   props: {
     fundCode: {
@@ -93,7 +92,6 @@ export default {
     const fundDetail = ref(null)
     const loading = ref(false)
     const error = ref('')
-    const showRawData = ref(false) // 控制是否显示原始数据
 
     // 处理净值走势数据格式
     const processedNetWorthTrend = computed(() => {
@@ -175,45 +173,6 @@ export default {
       }
     }
 
-    // 格式化键名显示
-    const formatKey = (key) => {
-      const keyMap = {
-        'fund_code': '基金代码',
-        'fund_name': '基金名称',
-        'name': '基金名称',
-        'fund_name_en': '英文名称',
-        'fund_type': '基金类型',
-        'purchase_rate': '申购费率',
-        'redemption_rate': '赎回费率',
-        'management_rate': '管理费率',
-        'custodian_rate': '托管费率',
-        'establishment_date': '成立日期',
-        'issue_date': '发行日期',
-        'issue_scale': '发行规模',
-        'latest_scale': '最新规模',
-        'investment_objective': '投资目标',
-        'investment_scope': '投资范围',
-        'investment_strategy': '投资策略',
-        'fund_rate': '现费率',
-        'fund_min_subscription': '最小申购金额',
-        'fund_size': '基金规模',
-        'hqdate': '行情日期',
-        'dwjz': '单位净值',
-        'gsz': '估算值',
-        'gszzl': '估算增长率',
-        'gztime': '估值时间'
-      }
-      return keyMap[key] || key
-    }
-
-    // 过滤不需要显示的基础信息字段
-    const filterBasicInfo = (key, value) => {
-      const ignoredKeys = ['stock_codes', 'managers', 'net_worth_trend', 'ac_worth_trend'];
-      if (ignoredKeys.includes(key)) return false;
-      if (typeof value === 'object' && value !== null) return false;
-      return true;
-    }
-
     // 监听基金代码变化
     watch(() => props.fundCode, (newCode) => {
       currentFundCode.value = newCode
@@ -231,12 +190,9 @@ export default {
       fundDetail,
       loading,
       error,
-      showRawData,
       processedNetWorthTrend,
       processedAcWorthTrend,
-      retry,
-      formatKey,
-      filterBasicInfo
+      retry
     }
   }
 }
@@ -244,97 +200,46 @@ export default {
 
 <style scoped>
 .fund-detail {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 0;
 }
 
 .detail-content {
-  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
+/* 图表区域 */
+.charts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+/* 详细信息区域 */
 .detail-sections {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.section {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.section h3 {
-  margin: 0 0 15px 0;
-  color: #333;
-  border-bottom: 2px solid #007bff;
-  padding-bottom: 8px;
-}
-
-/* 持仓股票样式 */
-.stock-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.stock-tag {
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  border: 1px solid #bbdefb;
-}
-
-.more-stocks {
-  color: #666;
-  font-size: 12px;
-  margin-top: 8px;
-}
-
-/* 基础信息网格 */
-.basic-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 12px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.info-label {
-  font-weight: bold;
-  color: #666;
-  min-width: 120px;
-}
-
-.info-value {
-  color: #333;
-  text-align: right;
-  flex: 1;
+  flex-direction: column;
+  gap: 0;
+  background: #f5f5f5;
+  padding: 24px;
 }
 
 /* 加载状态 */
 .loading {
   text-align: center;
-  padding: 40px;
+  padding: 60px 20px;
   color: #666;
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   border: 4px solid #f3f3f3;
-  border-top: 4px solid #007bff;
+  border-top: 4px solid #667eea;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
@@ -345,88 +250,103 @@ export default {
   100% { transform: rotate(360deg); }
 }
 
+.loading p {
+  font-size: 16px;
+  margin-top: 16px;
+}
+
 /* 错误状态 */
 .error {
   text-align: center;
-  padding: 40px;
+  padding: 60px 40px;
   color: #d32f2f;
   background: #ffebee;
-  border-radius: 8px;
+  border-radius: 12px;
   margin: 20px 0;
 }
 
 .error-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.error p {
+  font-size: 16px;
+  margin-bottom: 20px;
 }
 
 .retry-btn {
-  background: #d32f2f;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
+  padding: 12px 32px;
+  border-radius: 8px;
   cursor: pointer;
-  margin-top: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
 .retry-btn:hover {
-  background: #b71c1c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.retry-btn:active {
+  transform: translateY(0);
 }
 
 /* 空状态 */
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
+  padding: 80px 20px;
   color: #666;
+  background: white;
+  border-radius: 12px;
+  margin: 20px 0;
 }
 
 .empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
+  font-size: 80px;
+  margin-bottom: 24px;
+  opacity: 0.6;
 }
 
-/* 原始数据展示 */
-.json-data {
-  background: #f5f5f5;
-  padding: 15px;
-  border-radius: 4px;
-  font-size: 12px;
-  max-height: 300px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.no-data {
+.empty-state p {
+  font-size: 18px;
   color: #999;
-  font-style: italic;
-  text-align: center;
-  padding: 20px;
 }
 
 /* 响应式设计 */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .fund-detail {
-    padding: 10px;
+    padding: 0;
   }
   
   .detail-sections {
-    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .fund-detail {
+    padding: 0;
   }
   
-  .basic-info-grid {
-    grid-template-columns: 1fr;
+  .detail-sections {
+    padding: 12px;
   }
   
-  .info-row {
-    flex-direction: column;
-    align-items: flex-start;
+  .empty-state {
+    padding: 60px 20px;
   }
   
-  .info-value {
-    text-align: left;
-    margin-top: 4px;
+  .empty-icon {
+    font-size: 64px;
+  }
+  
+  .empty-state p {
+    font-size: 16px;
   }
 }
 </style>

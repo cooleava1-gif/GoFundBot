@@ -129,6 +129,21 @@ class FundAPI:
             'net_worth_trend': [],
             'ac_worth_trend': [],
             'stock_codes': [],
+            'grand_total': [],
+            'rate_in_similar_type': [],
+            'rate_in_similar_percent': [],
+            'asset_allocation': {},
+            'fluctuation_scale': {},
+            'holder_structure': {},
+            'fund_managers': [],
+            'performance_evaluation': {},
+            'buy_sedemption': {},
+            'syl_1y': '',
+            'syl_3y': '',
+            'syl_6y': '',
+            'syl_1n': '',
+            'fund_rate': '',
+            'fund_minsg': '',
             'update_time': datetime.now().isoformat()
         }
         
@@ -154,10 +169,109 @@ class FundAPI:
             if stock_codes_match:
                 try:
                     codes_raw = json.loads(stock_codes_match.group(1))
-                    # 天天基金返回的code有时候带有交易所后缀（如0025580），取前6�?
+                    # 天天基金返回的code有时候带有交易所后缀（如0025580），取前6位
                     data['stock_codes'] = [code[:6] for code in codes_raw]
                 except:
                     data['stock_codes'] = []
+            
+            # 解析累计收益率走势对比 Data_grandTotal
+            grand_total_match = re.search(r'var Data_grandTotal\s*=\s*(\[.*?\]);', js_content, re.DOTALL)
+            if grand_total_match:
+                try:
+                    data['grand_total'] = json.loads(grand_total_match.group(1))
+                except:
+                    pass
+            
+            # 解析同类排名走势 Data_rateInSimilarType
+            rate_similar_match = re.search(r'var Data_rateInSimilarType\s*=\s*(\[.*?\]);', js_content, re.DOTALL)
+            if rate_similar_match:
+                try:
+                    data['rate_in_similar_type'] = json.loads(rate_similar_match.group(1))
+                except:
+                    pass
+            
+            # 解析同类排名百分比 Data_rateInSimilarPersent
+            rate_percent_match = re.search(r'var Data_rateInSimilarPersent\s*=\s*(\[.*?\]);', js_content, re.DOTALL)
+            if rate_percent_match:
+                try:
+                    data['rate_in_similar_percent'] = json.loads(rate_percent_match.group(1))
+                except:
+                    pass
+            
+            # 解析资产配置 Data_assetAllocation
+            asset_alloc_match = re.search(r'var Data_assetAllocation\s*=\s*(\{.*?\});', js_content, re.DOTALL)
+            if asset_alloc_match:
+                try:
+                    data['asset_allocation'] = json.loads(asset_alloc_match.group(1))
+                except:
+                    pass
+            
+            # 解析规模变动 Data_fluctuationScale
+            scale_match = re.search(r'var Data_fluctuationScale\s*=\s*(\{.*?\});', js_content, re.DOTALL)
+            if scale_match:
+                try:
+                    data['fluctuation_scale'] = json.loads(scale_match.group(1))
+                except:
+                    pass
+            
+            # 解析持有人结构 Data_holderStructure
+            holder_match = re.search(r'var Data_holderStructure\s*=\s*(\{.*?\});', js_content, re.DOTALL)
+            if holder_match:
+                try:
+                    data['holder_structure'] = json.loads(holder_match.group(1))
+                except:
+                    pass
+            
+            # 解析基金经理 Data_currentFundManager
+            manager_match = re.search(r'var Data_currentFundManager\s*=\s*(\[.*?\]);', js_content, re.DOTALL)
+            if manager_match:
+                try:
+                    data['fund_managers'] = json.loads(manager_match.group(1))
+                except:
+                    pass
+            
+            # 解析业绩评价 Data_performanceEvaluation
+            performance_match = re.search(r'var Data_performanceEvaluation\s*=\s*(\{.*?\});', js_content, re.DOTALL)
+            if performance_match:
+                try:
+                    data['performance_evaluation'] = json.loads(performance_match.group(1))
+                except:
+                    pass
+            
+            # 解析申购赎回 Data_buySedemption
+            buy_sed_match = re.search(r'var Data_buySedemption\s*=\s*(\{.*?\});', js_content, re.DOTALL)
+            if buy_sed_match:
+                try:
+                    data['buy_sedemption'] = json.loads(buy_sed_match.group(1))
+                except:
+                    pass
+            
+            # 解析收益率
+            syl_1y_match = re.search(r'var syl_1y\s*=\s*"(.*?)";', js_content)
+            if syl_1y_match:
+                data['syl_1y'] = syl_1y_match.group(1)
+            
+            syl_3y_match = re.search(r'var syl_3y\s*=\s*"(.*?)";', js_content)
+            if syl_3y_match:
+                data['syl_3y'] = syl_3y_match.group(1)
+            
+            syl_6y_match = re.search(r'var syl_6y\s*=\s*"(.*?)";', js_content)
+            if syl_6y_match:
+                data['syl_6y'] = syl_6y_match.group(1)
+            
+            syl_1n_match = re.search(r'var syl_1n\s*=\s*"(.*?)";', js_content)
+            if syl_1n_match:
+                data['syl_1n'] = syl_1n_match.group(1)
+            
+            # 解析现费率
+            rate_match = re.search(r'var fund_Rate\s*=\s*"(.*?)";', js_content)
+            if rate_match:
+                data['fund_rate'] = rate_match.group(1)
+            
+            # 解析最小申购金额
+            minsg_match = re.search(r'var fund_minsg\s*=\s*"(.*?)";', js_content)
+            if minsg_match:
+                data['fund_minsg'] = minsg_match.group(1)
                     
         except Exception as e:
             print(f"解析JS数据失败: {e}")
