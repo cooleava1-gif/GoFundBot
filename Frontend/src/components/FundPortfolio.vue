@@ -2,30 +2,16 @@
   <div class="portfolio-card">
     <div class="card-header">
       <h3>📈 持仓明细</h3>
-      <div class="tab-switch">
-        <button 
-          :class="{ active: activeTab === 'stock' }" 
-          @click="activeTab = 'stock'"
-        >
-          股票持仓
-        </button>
-        <button 
-          :class="{ active: activeTab === 'bond' }" 
-          @click="activeTab = 'bond'"
-        >
-          债券持仓
-        </button>
-      </div>
     </div>
     <div class="card-body">
       <!-- 股票持仓 -->
-      <div v-if="activeTab === 'stock'" class="portfolio-content">
+      <div class="portfolio-content">
         <div v-if="hasStockData" class="stock-list">
           <div class="portfolio-header">
             <span class="col-rank">排名</span>
             <span class="col-code">代码</span>
             <span class="col-name">名称</span>
-            <span class="col-ratio">占比</span>
+            <span class="col-market">交易所</span>
           </div>
           <div 
             v-for="(stock, index) in stockList" 
@@ -35,46 +21,11 @@
             <span class="col-rank">{{ index + 1 }}</span>
             <span class="col-code">{{ stock.code }}</span>
             <span class="col-name">{{ stock.name }}</span>
-            <span class="col-ratio">
-              <div class="ratio-bar">
-                <div class="ratio-fill" :style="{ width: getRatioWidth(stock.ratio) }"></div>
-              </div>
-              <span class="ratio-text">{{ formatRatio(stock.ratio) }}</span>
-            </span>
+            <span class="col-market">{{ stock.market || '--' }}</span>
           </div>
         </div>
         <div v-else class="no-data">
           <p>暂无股票持仓数据</p>
-        </div>
-      </div>
-
-      <!-- 债券持仓 -->
-      <div v-if="activeTab === 'bond'" class="portfolio-content">
-        <div v-if="hasBondData" class="bond-list">
-          <div class="portfolio-header">
-            <span class="col-rank">排名</span>
-            <span class="col-code">代码</span>
-            <span class="col-name">名称</span>
-            <span class="col-ratio">占比</span>
-          </div>
-          <div 
-            v-for="(bond, index) in bondList" 
-            :key="bond.code || index" 
-            class="portfolio-item"
-          >
-            <span class="col-rank">{{ index + 1 }}</span>
-            <span class="col-code">{{ bond.code }}</span>
-            <span class="col-name">{{ bond.name }}</span>
-            <span class="col-ratio">
-              <div class="ratio-bar bond-bar">
-                <div class="ratio-fill" :style="{ width: getRatioWidth(bond.ratio) }"></div>
-              </div>
-              <span class="ratio-text">{{ formatRatio(bond.ratio) }}</span>
-            </span>
-          </div>
-        </div>
-        <div v-else class="no-data">
-          <p>暂无债券持仓数据</p>
         </div>
       </div>
     </div>
@@ -93,24 +44,28 @@ export default {
     }
   },
   setup(props) {
-    const activeTab = ref('stock')
-
-    // 解析持仓数据 - 格式: ["代码", "名称", "占比", ...]
+    // 解析持仓数据
     const parseHoldings = (codes) => {
       if (!codes || !Array.isArray(codes)) return []
       
+      // 如果数据已经是对象列表(新格式)，直接返回
+      if (codes.length > 0 && typeof codes[0] === 'object' && codes[0] !== null) {
+        return codes
+      }
+
       const holdings = []
-      // 每3个元素为一组: [代码, 名称, 占比]
+      // 旧格式: 每3个元素为一组: [代码, 名称, 占比]
       for (let i = 0; i < codes.length; i += 3) {
         if (i + 2 < codes.length) {
           holdings.push({
             code: codes[i],
             name: codes[i + 1],
-            ratio: parseFloat(codes[i + 2]) || 0
+            ratio: parseFloat(codes[i + 2]) || 0,
+            market: '--'
           })
         }
       }
-      return holdings.sort((a, b) => b.ratio - a.ratio)
+      return holdings
     }
 
     // 优先使用最新数据 (stock_codes_new)，否则使用旧数据
@@ -120,36 +75,11 @@ export default {
       return parseHoldings(newCodes?.length ? newCodes : oldCodes)
     })
 
-    const bondList = computed(() => {
-      const newCodes = props.portfolio?.bond_codes_new
-      const oldCodes = props.portfolio?.bond_codes
-      return parseHoldings(newCodes?.length ? newCodes : oldCodes)
-    })
-
     const hasStockData = computed(() => stockList.value.length > 0)
-    const hasBondData = computed(() => bondList.value.length > 0)
-
-    const formatRatio = (ratio) => {
-      if (ratio === null || ratio === undefined) return '--'
-      return ratio.toFixed(2) + '%'
-    }
-
-    const getRatioWidth = (ratio) => {
-      if (!ratio) return '0%'
-      // 最大占比假设为20%，计算相对宽度
-      const maxRatio = 20
-      const width = Math.min((ratio / maxRatio) * 100, 100)
-      return width + '%'
-    }
 
     return {
-      activeTab,
       stockList,
-      bondList,
-      hasStockData,
-      hasBondData,
-      formatRatio,
-      getRatioWidth
+      hasStockData
     }
   }
 }
@@ -177,32 +107,6 @@ export default {
   color: white;
   font-size: 14px;
   font-weight: 600;
-}
-
-.tab-switch {
-  display: flex;
-  gap: 6px;
-}
-
-.tab-switch button {
-  background: rgba(255,255,255,0.2);
-  border: none;
-  color: white;
-  padding: 4px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.3s;
-}
-
-.tab-switch button.active {
-  background: white;
-  color: #667eea;
-  font-weight: 600;
-}
-
-.tab-switch button:hover:not(.active) {
-  background: rgba(255,255,255,0.3);
 }
 
 .card-body {
@@ -243,19 +147,23 @@ export default {
 }
 
 .col-rank {
-  width: 32px;
+  width: 40px;
   text-align: center;
   color: #999;
   font-weight: 500;
+  margin-right: 12px;
 }
 
 .portfolio-item .col-rank {
-  width: 32px;
-  height: 20px;
-  line-height: 20px;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
   background: #f0f0f0;
-  border-radius: 10px;
+  border-radius: 50%;
   font-size: 11px;
+  margin: 0 8px;
+  display: inline-block;
+  text-align: center;
 }
 
 .portfolio-item:nth-child(2) .col-rank { background: #ffd700; color: #fff; }
@@ -263,7 +171,7 @@ export default {
 .portfolio-item:nth-child(4) .col-rank { background: #cd7f32; color: #fff; }
 
 .col-code {
-  width: 65px;
+  width: 60px;
   color: #667eea;
   font-family: monospace;
   font-size: 11px;
@@ -279,36 +187,10 @@ export default {
   white-space: nowrap;
 }
 
-.col-ratio {
-  width: 90px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ratio-bar {
-  flex: 1;
-  height: 6px;
-  background: #f0f0f0;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.ratio-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-  border-radius: 3px;
-}
-
-.bond-bar .ratio-fill {
-  background: linear-gradient(90deg, #52c41a 0%, #73d13d 100%);
-}
-
-.ratio-text {
-  width: 40px;
+.col-market {
+  width: 60px;
   text-align: right;
-  font-weight: 600;
-  color: #333;
+  color: #888;
   font-size: 11px;
 }
 
@@ -317,7 +199,6 @@ export default {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #999;
-  font-size: 13px;
 }
 </style>
+ 

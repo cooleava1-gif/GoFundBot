@@ -58,9 +58,12 @@ export default {
     const hasData = computed(() => categories.value.length > 0 && series.value.length > 0)
 
     const colors = {
-      '机构持有': '#667eea',
-      '个人持有': '#91cc75',
-      '内部持有': '#fac858'
+      '机构持有比例': '#5470c6', // 蓝色
+      '个人持有比例': '#ee6666', // 红色
+      '内部持有比例': '#91cc75', // 绿色
+      '机构持有': '#5470c6',
+      '个人持有': '#ee6666',
+      '内部持有': '#91cc75'
     }
 
     const getColor = (name) => {

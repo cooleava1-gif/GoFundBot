@@ -1,6 +1,6 @@
 <template>
   <div class="fund-ranking-card">
-    <div class="card-header">
+    <div class="card-header" :class="{ 'header-expanded': isExpanded }">
       <h3>🏆 同类排名走势</h3>
       <div class="time-ranges">
         <span 
@@ -59,6 +59,10 @@ export default {
     rateInSimilarPercent: {
       type: Array,
       default: () => []
+    },
+    isExpanded: {
+      type: Boolean,
+      default: false
     }
   },
   setup(props) {
@@ -183,7 +187,7 @@ export default {
         },
         grid: {
           left: '11%',
-          right: '12%',
+          right: '13%',
           bottom: '12%',
           top: '4%',
           containLabel: false
@@ -288,6 +292,10 @@ export default {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+.header-expanded {
+  padding-right: 50px; /* Space for close button */
 }
 
 .time-ranges {

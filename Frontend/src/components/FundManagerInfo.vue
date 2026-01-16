@@ -1,7 +1,7 @@
 <template>
   <div class="fund-manager-card">
     <div class="card-header">
-      <h3>👨‍💼 基金经理</h3>
+      <h3>👨‍💼 基金经理能力评估</h3>
     </div>
     <div class="card-body">
       <div v-if="hasManagers" class="managers-container">

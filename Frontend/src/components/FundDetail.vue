@@ -45,6 +45,13 @@
             />
           </div>
         </div>
+
+        <!-- 申购赎回情况 - 全宽 -->
+        <div class="card card-full clickable" @click="openModal('subscription')">
+          <FundSubscription
+            :subscriptionRedemption="fundDetail.subscription_redemption"
+          />
+        </div>
       </div>
 
       <!-- 右侧边栏 -->
@@ -59,6 +66,11 @@
             :fundManagers="fundDetail.fund_managers"
           />
         </div>
+        <div class="card card-sidebar clickable" @click="openModal('ability')">
+          <FundAbilityEval
+            :performanceEvaluation="fundDetail.performance_evaluation"
+          />
+        </div>
       </div>
     </div>
     
@@ -71,6 +83,7 @@
             v-if="modalType === 'ranking'"
             :rateInSimilarType="fundDetail.ranking_trend"
             :rateInSimilarPercent="fundDetail.ranking_percentage"
+            :isExpanded="true"
           />
           <FundAssetAllocation
             v-if="modalType === 'asset'"
@@ -91,6 +104,14 @@
           <FundManagerInfo
             v-if="modalType === 'manager'"
             :fundManagers="fundDetail.fund_managers"
+          />
+          <FundAbilityEval
+            v-if="modalType === 'ability'"
+            :performanceEvaluation="fundDetail.performance_evaluation"
+          />
+          <FundSubscription
+            v-if="modalType === 'subscription'"
+            :subscriptionRedemption="fundDetail.subscription_redemption"
           />
         </div>
       </div>
@@ -127,6 +148,8 @@ import FundScaleChange from './FundScaleChange.vue'
 import FundManagerInfo from './FundManagerInfo.vue'
 import FundHolderStructure from './FundHolderStructure.vue'
 import FundPortfolio from './FundPortfolio.vue'
+import FundAbilityEval from './FundAbilityEval.vue'
+import FundSubscription from './FundSubscription.vue'
 import { fundAPI } from '../services/api'
 
 export default {
@@ -139,7 +162,9 @@ export default {
     FundScaleChange,
     FundManagerInfo,
     FundHolderStructure,
-    FundPortfolio
+    FundPortfolio,
+    FundAbilityEval,
+    FundSubscription
   },
   props: {
     fundCode: {
@@ -350,6 +375,20 @@ export default {
 /* 中等高度卡片 - 增加高度 */
 .card-md {
   height: 450px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 大卡片 - 综合评价 */
+.card-lg {
+  height: 550px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 全宽卡片 - 申购赎回 */
+.card-full {
+  height: 400px;
   display: flex;
   flex-direction: column;
 }

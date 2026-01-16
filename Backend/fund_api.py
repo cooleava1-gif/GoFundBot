@@ -3,12 +3,14 @@ import json
 import re
 from datetime import datetime
 from typing import Dict, List, Any, Union
+from stock_service import StockService
 
 # --- 数据清洗器 (原 api_handler.py) ---
 
 class FundDataCleaner:
     def __init__(self):
         self.cleaned_data = {}
+        self.stock_service = StockService()
     
     def clean_js_variable(self, value: str) -> Any:
         """清洗JavaScript变量值"""
@@ -144,10 +146,35 @@ class FundDataCleaner:
     
     def clean_portfolio_data(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """清洗投资组合数据"""
+        # 获取原始代码列表
+        stock_codes_raw = self.clean_array_data(raw_data.get('stockCodes'))
+        
+        # 转换为包含名称的对象列表
+        enriched_stocks = []
+        if stock_codes_raw:
+            for code in stock_codes_raw:
+                try:
+                    stock_info = self.stock_service.get_stock_info(code)
+                    display_code = self.stock_service.normalize_code(code)
+
+                    enriched_stocks.append({
+                        'code': display_code,
+                        'original_code': code,
+                        'name': stock_info.get('name', 'Unknown'),
+                        'market': stock_info.get('market', '--'),
+                        'ratio': 0  # 数据源缺失占比，设为0
+                    })
+                except Exception as e:
+                    print(f"Error processing stock code {code}: {e}")
+                    enriched_stocks.append({'code': str(code), 'name': 'Unknown', 'market': '--', 'ratio': 0})
+        
         portfolio = {
-            'stock_codes': self.clean_array_data(raw_data.get('stockCodes')),
+            'stock_codes': enriched_stocks,
             'bond_codes': self.clean_array_data(raw_data.get('zqCodes')),
-            'stock_codes_new': self.clean_array_data(raw_data.get('stockCodesNew')),
+            # 为了让前端统一使用 enriched_stocks，我们将 stock_codes_new 也设为同样的数据
+            # 或者是 None，让前端回退到 stock_codes。
+            # 鉴于 stock_codes_new 格式复杂 (116.xxxx)，我们直接用处理好的数据覆盖它
+            'stock_codes_new': enriched_stocks, 
             'bond_codes_new': self.clean_array_data(raw_data.get('zqCodesNew'))
         }
         return portfolio
