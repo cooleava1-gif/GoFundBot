@@ -15,6 +15,16 @@ export const fundAPI = {
     return api.get(`/fund/search?q=${encodeURIComponent(keyword)}`)
   },
   
+  // 获取搜索数据库状态
+  getSearchStatus() {
+    return api.get('/fund/search/status')
+  },
+  
+  // 更新搜索数据库
+  updateSearchDatabase() {
+    return api.post('/fund/search/update')
+  },
+  
   // 获取基金详细信息
   getFundDetail(fundCode) {
     return api.get(`/fund/${fundCode}`)

@@ -357,6 +357,79 @@ class FundAPI:
             print(f"Search error: {e}")
             return []
 
+    def _parse_js_value(self, js_content: str, start_pos: int) -> tuple:
+        """
+        从指定位置解析 JS 值（数组、对象、字符串、数字等）
+        返回 (解析后的值, 结束位置)
+        """
+        pos = start_pos
+        while pos < len(js_content) and js_content[pos] in ' \t\n\r':
+            pos += 1
+        
+        if pos >= len(js_content):
+            return None, pos
+        
+        char = js_content[pos]
+        
+        # 数组
+        if char == '[':
+            depth = 1
+            end_pos = pos + 1
+            while end_pos < len(js_content) and depth > 0:
+                c = js_content[end_pos]
+                if c == '[':
+                    depth += 1
+                elif c == ']':
+                    depth -= 1
+                elif c == '"' or c == "'":
+                    # 跳过字符串内容
+                    quote = c
+                    end_pos += 1
+                    while end_pos < len(js_content):
+                        if js_content[end_pos] == quote and js_content[end_pos-1] != '\\':
+                            break
+                        end_pos += 1
+                end_pos += 1
+            return js_content[pos:end_pos], end_pos
+        
+        # 对象
+        elif char == '{':
+            depth = 1
+            end_pos = pos + 1
+            while end_pos < len(js_content) and depth > 0:
+                c = js_content[end_pos]
+                if c == '{':
+                    depth += 1
+                elif c == '}':
+                    depth -= 1
+                elif c == '"' or c == "'":
+                    quote = c
+                    end_pos += 1
+                    while end_pos < len(js_content):
+                        if js_content[end_pos] == quote and js_content[end_pos-1] != '\\':
+                            break
+                        end_pos += 1
+                end_pos += 1
+            return js_content[pos:end_pos], end_pos
+        
+        # 字符串
+        elif char == '"' or char == "'":
+            quote = char
+            end_pos = pos + 1
+            while end_pos < len(js_content):
+                if js_content[end_pos] == quote and js_content[end_pos-1] != '\\':
+                    end_pos += 1
+                    break
+                end_pos += 1
+            return js_content[pos:end_pos], end_pos
+        
+        # 其他（数字、布尔值等）- 读取到分号
+        else:
+            end_pos = pos
+            while end_pos < len(js_content) and js_content[end_pos] != ';':
+                end_pos += 1
+            return js_content[pos:end_pos].strip(), end_pos
+    
     def _fetch_raw_data(self, fund_code: str) -> Union[Dict[str, Any], None]:
         """
         获取原始基金数据（字典形式），包含所有JS变量。
@@ -370,31 +443,31 @@ class FundAPI:
             if response.status_code == 200:
                 js_content = response.text
                 
-                # 提取所有 var xxx = ...; 也就是 JS 变量
-                # 兼容值可能是数字、字符串、数组[]、对象{}
-                # 正则解析：var (变量名) = (值);
-                # 值可能跨多行，非贪婪匹配
-                var_matches = re.findall(r'var\s+(\w+)\s*=\s*(.*?);', js_content, re.DOTALL)
-                
-                for var_name, var_value in var_matches:
-                    var_name = var_name.strip()
-                    var_value = var_value.strip()
+                # 查找所有 var xxx = 声明
+                var_pattern = re.compile(r'var\s+(\w+)\s*=\s*')
+                for match in var_pattern.finditer(js_content):
+                    var_name = match.group(1)
+                    value_start = match.end()
                     
-                    try:
-                        # 尝试 JSON 解析 (如果是数组或对象)
-                        if var_value.startswith('[') or var_value.startswith('{'):
-                             data[var_name] = json.loads(var_value)
-                        # 尝试去引号 (如果是字符串)
-                        elif var_value.startswith('"') and var_value.endswith('"'):
-                             data[var_name] = var_value[1:-1]
-                        elif var_value.startswith("'") and var_value.endswith("'"):
-                             data[var_name] = var_value[1:-1]
-                        # 数字或其它
-                        else:
-                            data[var_name] = var_value
-                    except:
-                        # 解析失败保底保留原始字符串
-                        data[var_name] = var_value
+                    # 解析值
+                    raw_value, _ = self._parse_js_value(js_content, value_start)
+                    
+                    if raw_value:
+                        try:
+                            # 尝试 JSON 解析
+                            if raw_value.startswith('[') or raw_value.startswith('{'):
+                                # JS 中可能使用单引号，需要转换为双引号才能解析 JSON
+                                json_value = raw_value.replace("'", '"')
+                                data[var_name] = json.loads(json_value)
+                            elif raw_value.startswith('"') and raw_value.endswith('"'):
+                                data[var_name] = raw_value[1:-1]
+                            elif raw_value.startswith("'") and raw_value.endswith("'"):
+                                data[var_name] = raw_value[1:-1]
+                            else:
+                                data[var_name] = raw_value
+                        except json.JSONDecodeError:
+                            # 如果 JSON 解析失败，保留原始字符串
+                            data[var_name] = raw_value
                         
         except Exception as e:
             print(f"Error fetching detail for {fund_code}: {e}")

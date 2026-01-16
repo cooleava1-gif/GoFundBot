@@ -71,6 +71,11 @@
             :performanceEvaluation="fundDetail.performance_evaluation"
           />
         </div>
+        <div class="card card-sidebar clickable" @click="openModal('sametype')">
+          <FundSameType
+            :sameTypeFunds="fundDetail.same_type_funds"
+          />
+        </div>
       </div>
     </div>
     
@@ -113,6 +118,11 @@
             v-if="modalType === 'subscription'"
             :subscriptionRedemption="fundDetail.subscription_redemption"
           />
+          <FundSameType
+            v-if="modalType === 'sametype'"
+            :sameTypeFunds="fundDetail.same_type_funds"
+            :isExpanded="true"
+          />
         </div>
       </div>
     </div>
@@ -150,6 +160,7 @@ import FundHolderStructure from './FundHolderStructure.vue'
 import FundPortfolio from './FundPortfolio.vue'
 import FundAbilityEval from './FundAbilityEval.vue'
 import FundSubscription from './FundSubscription.vue'
+import FundSameType from './FundSameType.vue'
 import { fundAPI } from '../services/api'
 
 export default {
@@ -164,7 +175,8 @@ export default {
     FundHolderStructure,
     FundPortfolio,
     FundAbilityEval,
-    FundSubscription
+    FundSubscription,
+    FundSameType
   },
   props: {
     fundCode: {
@@ -388,7 +400,7 @@ export default {
 
 /* 全宽卡片 - 申购赎回 */
 .card-full {
-  height: 400px;
+  height: 480px;
   display: flex;
   flex-direction: column;
 }

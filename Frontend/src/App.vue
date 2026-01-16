@@ -2,8 +2,8 @@
 <template>
   <div id="app">
     <header class="app-header">
-      <h1>💰 基金分析系统</h1>
-      <p>专业的基金数据分析工具</p>
+      <h1>GoFundBot</h1>
+      <p>一个有趣的基金分析机器人</p>
     </header>
     
     <main class="app-main">

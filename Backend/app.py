@@ -3,6 +3,7 @@ from flask_cors import CORS
 from database import init_db, get_db
 from models import FundBasicInfo, FundDetail
 from fund_api import FundAPI
+from fund_list_cache import get_fund_list_cache
 from sqlalchemy.orm import Session
 import json
 
@@ -12,6 +13,7 @@ CORS(app)  # 允许跨域请求
 # 初始化数据库
 init_db()
 fund_api = FundAPI()
+fund_list_cache = get_fund_list_cache()
 
 @app.route('/')
 def hello():
@@ -20,12 +22,29 @@ def hello():
 
 @app.route('/api/fund/search', methods=['GET'])
 def search_funds():
-    """根据关键词搜索基金列表"""
-    keyword = request.args.get('q', '') # 获取查询参数 基金名称或代码
+    """根据关键词搜索基金列表（使用本地缓存）"""
+    keyword = request.args.get('q', '')
     if not keyword:
         return jsonify({"error": "Keyword is required"}), 400
-    funds = fund_api.search_funds(keyword) # 调用API搜索基金
+    
+    # 使用本地缓存搜索
+    funds = fund_list_cache.search(keyword, limit=20)
     return jsonify({"data": funds})
+
+@app.route('/api/fund/search/status', methods=['GET'])
+def get_search_status():
+    """获取搜索数据库状态"""
+    status = fund_list_cache.get_status()
+    return jsonify(status)
+
+@app.route('/api/fund/search/update', methods=['POST'])
+def update_search_database():
+    """更新本地基金搜索数据库"""
+    result = fund_list_cache.update_from_api()
+    if result['success']:
+        return jsonify(result)
+    else:
+        return jsonify(result), 500
 
 @app.route('/api/fund/<fund_code>', methods=['GET'])
 def get_fund_detail(fund_code):

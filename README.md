@@ -1,222 +1,116 @@
-## 1. 数据整理（DataProcess.py）
+# GoFundBot
 
-### 1.1 数据源
+GoFundBot 是一个基于 Python (Flask) 和 Vue 3 构建的基金分析与可视化工具。它通过获取天天基金网的公开数据，为用户提供便捷的基金搜索、详细信息查询、业绩评估及多维度的图表分析功能。
 
-> 本项目采用的数据均来自天天基金网（https://fund.eastmoney.com/）的官方API。
+## 🚀 功能特性
 
-（1）单个基金当前净值：http://fundgz.1234567.com.cn/js/014243.js ，数据格式如下。
+*   **基金搜索**：支持通过关键词快速搜索基金（基于本地缓存优化），快速定位目标基金。
+*   **基本信息概览**：展示基金的单位净值、日涨幅、基金规模、费率结构等核心数据。
+*   **深度数据分析**：
+    *   **能力评估**：通过雷达图直观展示基金的盈利能力、抗风险能力等。
+    *   **资产配置**：分析股票、债券、现金的资产占比。
+    *   **持仓分析**：查看前十大重仓股及其持仓占比变化。
+    *   **排名趋势**：展示基金在同类产品中的排名走势。
+    *   **经理信息**：展示现任基金经理的从业年限及管理业绩。
+*   **交互式图表**：集成 ECharts，提供流畅的数据可视化体验。
 
-| fundcode | name     | jzrq     | dwjz     | gsz      | gszzl    | gztime   |
-| -------- | -------- | -------- | -------- | -------- | -------- | -------- |
-| 基金代码 | 基金名称 | 净值日期 | 单位净值 | 估计净值 | 估计涨幅 | 估计时间 |
+## 🛠 技术栈
 
-（2）单个基金全部信息：https://fund.eastmoney.com/pingzhongdata/001186.js，数据格式如下：
+### 后端 (Backend)
+*   **语言**: Python 3
+*   **框架**: Flask
+*   **数据库/ORM**: SQLAlchemy (默认使用 SQLite), `database.py`
+*   **网络请求**: Requests
+*   **数据处理**: Pandas (如果用到), JSON
 
-- 基金基础信息（用于低费率筛选）
+### 前端 (Frontend)
+*   **框架**: Vue 3 (Composition API)
+*   **构建工具**: Vite
+*   **可视化**: ECharts, Vue-Echarts
+*   **HTTP 客户端**: Axios
+*   **样式**: CSS / Scss
 
-  ```js
-  var fS_name = "华泰柏瑞港股通医疗精选混合发起式C";
-  var fS_code = "019127";
-  var fund_sourceRate="0.00"; // 原费率
-  var fund_Rate="0.00";       // 现费率
-  var fund_minsg="10";        // 最小申购金额
-  ```
+## 📋 环境准备
 
-- 持仓信息（判断基金类型偏股or偏债、判断基金是否高仓位运作）
+在运行项目之前，请确保您的本地环境已安装以下软件：
 
-  ```js
-  var stockCodes = [...];      // 股票代码
-  var zqCodes = "";            // 债券代码
-  var stockCodesNew = [...];   // 新市场格式股票代码
-  var Data_fundSharesPositions = [  // 每个时间点的股票仓位比例
-    [时间戳, 股票仓位%], ...
-  ];
-     
-  var Data_assetAllocation = {
-    "series":[
-      {"name":"股票占净比","data":[81.61,94.5]},
-      {"name":"债券占净比","data":[0,0]},
-      {"name":"现金占净比","data":[31.05,9.69]},
-      {"name":"净资产","data":[0.1521,9.2566]}
-    ]
-  };
-  ```
+*   **Node.js** (推荐 LTS 版本) 和 `npm`
+*   **Python 3.8+** 或 **Anaconda/Miniconda**
 
-- 收益率表现
+## ⚡ 快速开始
 
-  - **阶段收益**：量化多因子分析，筛选基金涨幅
+### 方式一：一键启动 (Windows)
 
-    ```js
-    var syl_1n="";     // 近一年收益率
-    var syl_6y="8.51"; // 近6月收益率
-    var syl_3y="-5.03";// 近3月收益率
-    var syl_1y="2.13"; // 近1月收益率
-    ```
+如果您的环境满足以下条件，可以直接使用脚本启动：
+1. 已安装 Conda。
+2. Conda 中已创建名为 `fundbot` 的虚拟环境（或者您可以修改 `.bat` 文件适配您的环境名）。
 
-  - **走势数据**：
-
-    - 单位净值走势 (`Data_netWorthTrend`)：计算最大回撤，绘制净值曲线
-
-      ```js
-      var Data_netWorthTrend = [
-        {
-          x: 时间戳,
-          y: 单位净值,
-          equityReturn: 当日涨跌幅,
-          unitMoney: 分红
-        }
-      ];
-      ```
-
-    - 累计净值走势：可直接用于计算累计收益率
-
-      ```js
-      var Data_ACWorthTrend = [
-        [时间戳, 累计净值]
-      ];
-      ```
-
-    - 累计收益率走势对比：判断是否跑赢同类 / 大盘
-
-      ```js
-      var Data_grandTotal = [
-        { name: "本基金", data: [...] },
-        { name: "同类平均", data: [...] },
-        { name: "沪深300", data: [...] }
-      ];
-      ```
-
-    - 同类排名走势：同类前 10% / 20% 筛选；评估基金长期相对表现
-
-      ```js
-      var Data_rateInSimilarType = [
-        { x: 时间, y: 排名, sc: 同类总数 }
-      ];
-      
-      var Data_rateInSimilarPersent = [
-        [时间, 百分比]
-      ];
-      ```
-
-- 基金规模变动：筛选“规模过小 / 过大”的基金
-
-  ```js
-  var Data_fluctuationScale = {
-    categories: ["2025-06-18","2025-06-30","2025-09-30"],
-    series: [
-      {"y":0.00,"mom":"--"},
-      {"y":0.01,"mom":"3053.93%"},
-      {"y":8.52,"mom":"62042.09%"}
-    ]
-  };
-  ```
-
-- 持有人结构：判断是否机构看好
-
-  ```js
-  var Data_holderStructure = {
-    "series":[
-      {"name":"机构持有比例","data":[0.0]},
-      {"name":"个人持有比例","data":[100.0]},
-      {"name":"内部持有比例","data":[0.0735]}
-    ]
-  };
-  ```
-
-- 基金综合评价：构建多因子打分模型
-
-  ```js
-  var Data_performanceEvaluation = {
-    "categories":["选证能力","收益率","抗风险","稳定性","择时能力"],
-    "data":[null,null,null,null,null]
-  };
-  ```
-
-- 基金经理信息与评价：基金经理星级，能力量化分析
-
-  ```js
-  var Data_currentFundManager = [{
-    "name":"张弘",
-    "star":4,
-    "workTime":"5年又14天",
-    "fundSize":"22.38亿(9只基金)",
-    "power":{
-      "categories":["经验值","收益率","抗风险","稳定性","择时能力"],
-      "data":[79.80,89.30,62.60,61.70,66.20]
-    },
-    "profit":{
-      "series":[
-        {"data":[
-          {"y":14.11}, // 任期收益
-          {"y":28.3},  // 同类平均
-          {"y":23.61}  // 沪深300
-        ]}
-      ]
-    }
-  }];
-  ```
-
-- 资金流：识别是否“被资金追捧”
-
-  ```js
-  var Data_buySedemption = {
-    "series":[
-      {"name":"期间申购","data":[...]},
-      {"name":"期间赎回","data":[...]},
-      {"name":"总份额","data":[...]}
-    ]
-  };
-  ```
-
-- 同类基金涨幅榜：
-
-  ```js
-  var swithSameType = [
-    ['022364_永赢科技智选混合发起_235.49', ...],
-    ...
-  ];
-  ```
-
-（3）基金基础信息列表：http://fund.eastmoney.com/js/fundcode_search.js ，格式如下：
-
-```
-格式：["000001","HXCZ","华夏成长","混合型","HUAXIACHENGZHANG"]
+双击运行根目录下的：
+```bash
+一键启动.bat
 ```
 
-------
+### 方式二：手动安装与启动
 
+#### 1. 后端服务 (Backend)
 
+```bash
+# 1. 进入后端目录
+cd Backend
 
-### 1.2 核心函数解释
+# 2. 创建/激活虚拟环境 (可选，但在 bat 脚本中默认名为 fundbot)
+# conda create -n fundbot python=3.9
+# conda activate fundbot
 
-- **get_fund_basic_info(fund_code)**
-  - 功能：获取基金综合信息，包括实时估值、基本资料等
-  - 输入：基金代码
-  - 输出：基金最近一个交易日的单位净值(dwjz)、基金名称(name)、净值日期(jzrq)、估计净值(gsz)、估计增长率%(gszzl)、估计日期(gztime)等
+# 3. 安装依赖
+pip install -r requirements.txt
 
-- **get_fund_net_worth_history(fund_code, years=None)**
-  - 功能：获取基金历史净值数据
-  - 输入：基金代码；显示最近多少年的数据（None表示显示全部）
-  - 输出：包含日期和净值的DataFrame
+# 4. 启动 Flask 应用
+python app.py
+```
+后端服务启动后，默认监听 `http://localhost:5000`。
 
-- **calculate_max_drawdown(net_worth_series)**
-  - 功能：计算最大回撤
-  - 输入：净值序列
-  - 输出：包含最大回撤信息的字典
+#### 2. 前端界面 (Frontend)
 
-- **calculate_technical_indicators(df, window=20)**
-  - 功能：计算技术指标，包含20日均值，累计收益率等
-- **plot_fund_vector_graph(fund_code, years=None, save_path=None)**
-  - 功能：绘制基金历史表现矢量图
-  - fund_code (str): 基金代码
-  - years (int, optional): 显示最近多少年的数据，None表示显示全部数据，1表示最近1年的数据，依此类推
-  - save_path (str, optional): 保存路径，例如 'fund_plot.svg'；默认为 None (直接显示图表)
+```bash
+# 1. 进入前端目录
+cd Frontend
 
+# 2. 安装 Node 依赖
+npm install
 
+# 3. 启动开发服务器
+npm run dev
+```
+启动成功后，控制台会显示访问地址（通常为 `http://localhost:5173`）。在浏览器中打开该地址即可使用。
 
-## 预测策略
+## 📂 项目结构
 
- LSTM方法
+```text
+MyBot/
+├── Backend/                 # 后端源码
+│   ├── app.py               # 后端入口文件
+│   ├── models.py            # 数据模型定义
+│   ├── fund_api.py          # 基金数据获取接口
+│   └── ...
+├── Frontend/                # 前端源码
+│   ├── src/
+│   │   ├── components/      # Vue 组件 (FundDetail, FundChart 等)
+│   │   ├── services/        # API 请求封装
+│   │   ├── App.vue          # 主组件
+│   │   └── main.js          # 入口文件
+│   └── ...
+├── Data/                    # 本地数据缓存 (如 fund_list_cache.json)
+├── 开发笔记.md              # 项目开发过程中的笔记与接口文档
+├── 一键启动.bat             # Windows 启动脚本
+└── requirements.txt         # 后端依赖列表
+```
 
-- **回溯** ：滑动窗口的长度，表示我们回溯过去的周期数。
-- **前瞻** ：我们想要预测未来的周期数。
+## 📝 数据来源与免责声明
+
+*   **数据来源**：本项目数据来源于 [天天基金网](https://fund.eastmoney.com/) 的公开接口。
+*   **免责声明**：本项目仅供学习与技术交流使用，不构成任何投资建议。数据可能存在延迟或误差，投资有风险，理财需谨慎。
+
+## 🤝 贡献
+
+欢迎提交 Issue 或 Pull Request 来完善这个项目！

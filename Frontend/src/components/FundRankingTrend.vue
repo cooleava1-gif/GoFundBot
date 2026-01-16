@@ -198,7 +198,6 @@ export default {
         },
         yAxis: {
           type: 'value',
-          name: '前百分之',
           inverse: true, // 反转Y轴，越小越好
           axisLabel: {
             formatter: '{value}%'
@@ -233,8 +232,8 @@ export default {
             silent: true,
             symbol: 'none',
             data: [
-              { yAxis: 10, label: { formatter: '前10%' }, lineStyle: { color: '#52c41a', type: 'dashed' } },
-              { yAxis: 25, label: { formatter: '前25%' }, lineStyle: { color: '#91cc75', type: 'dashed' } },
+              { yAxis: 10, label: { formatter: '后10%' }, lineStyle: { color: '#52c41a', type: 'dashed' } },
+              { yAxis: 25, label: { formatter: '后25%' }, lineStyle: { color: '#91cc75', type: 'dashed' } },
               { yAxis: 50, label: { formatter: '中位数' }, lineStyle: { color: '#fac858', type: 'dashed' } }
             ]
           }
