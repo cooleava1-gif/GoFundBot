@@ -1,38 +1,98 @@
 <template>
   <div class="fund-detail">
     <!-- 基金基础信息组件 -->
-    <FundBasicInfo :fundCode="currentFundCode" />
+    <FundBasicInfo :fundCode="currentFundCode" :fundData="fundDetail" />
     
-    <!-- 主要内容区域 -->
-    <div v-if="fundDetail" class="detail-content">
+    <!-- 主要内容区域 - Dashboard 布局 -->
+    <div v-if="fundDetail" class="dashboard">
       
-      <!-- 中心区域：图表展示 -->
-      <div class="charts-section">
-        <!-- 净值走势图 (含收益对比、回撤修复) -->
-        <FundChart
-          :netWorthTrend="processedNetWorthTrend"
-          :acWorthTrend="processedAcWorthTrend"
-          :grandTotal="fundDetail.grand_total"
-        />
+      <!-- 左侧主区域 -->
+      <div class="main-area">
+        <!-- 净值走势图 -->
+        <div class="card card-chart">
+          <FundChart
+            :netWorthTrend="processedNetWorthTrend"
+            :acWorthTrend="processedAcWorthTrend"
+            :grandTotal="fundDetail.total_return_trend"
+          />
+        </div>
         
-        <!-- 同类排名走势 -->
-        <FundRankingTrend
-          :rateInSimilarType="fundDetail.rate_in_similar_type"
-          :rateInSimilarPercent="fundDetail.rate_in_similar_percent"
-        />
+        <!-- 中间两列区域 -->
+        <div class="grid-2">
+          <div class="card card-md clickable" @click="openModal('ranking')">
+            <FundRankingTrend
+              :rateInSimilarType="fundDetail.ranking_trend"
+              :rateInSimilarPercent="fundDetail.ranking_percentage"
+            />
+          </div>
+          <div class="card card-md clickable" @click="openModal('asset')">
+            <FundAssetAllocation
+              :assetAllocation="fundDetail.asset_allocation"
+            />
+          </div>
+        </div>
+
+        <!-- 底部两列区域 -->
+        <div class="grid-2">
+          <div class="card card-md clickable" @click="openModal('holder')">
+            <FundHolderStructure
+              :holderStructure="fundDetail.holder_structure"
+            />
+          </div>
+          <div class="card card-md clickable" @click="openModal('scale')">
+            <FundScaleChange
+              :fluctuationScale="fundDetail.scale_fluctuation"
+            />
+          </div>
+        </div>
       </div>
-      
-      <!-- 详细信息区域 -->
-      <div class="detail-sections">
-        <!-- 资产配置 -->
-        <FundAssetAllocation
-          :assetAllocation="fundDetail.asset_allocation"
-        />
-        
-        <!-- 基金规模变动 -->
-        <FundScaleChange
-          :fluctuationScale="fundDetail.fluctuation_scale"
-        />
+
+      <!-- 右侧边栏 -->
+      <div class="sidebar">
+        <div class="card card-sidebar clickable" @click="openModal('portfolio')">
+          <FundPortfolio
+            :portfolio="fundDetail.portfolio"
+          />
+        </div>
+        <div class="card card-sidebar clickable" @click="openModal('manager')">
+          <FundManagerInfo
+            :fundManagers="fundDetail.fund_managers"
+          />
+        </div>
+      </div>
+    </div>
+    
+    <!-- 放大模态框 -->
+    <div v-if="modalVisible" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-content">
+        <button class="modal-close" @click="closeModal">×</button>
+        <div class="modal-body">
+          <FundRankingTrend
+            v-if="modalType === 'ranking'"
+            :rateInSimilarType="fundDetail.ranking_trend"
+            :rateInSimilarPercent="fundDetail.ranking_percentage"
+          />
+          <FundAssetAllocation
+            v-if="modalType === 'asset'"
+            :assetAllocation="fundDetail.asset_allocation"
+          />
+          <FundHolderStructure
+            v-if="modalType === 'holder'"
+            :holderStructure="fundDetail.holder_structure"
+          />
+          <FundScaleChange
+            v-if="modalType === 'scale'"
+            :fluctuationScale="fundDetail.scale_fluctuation"
+          />
+          <FundPortfolio
+            v-if="modalType === 'portfolio'"
+            :portfolio="fundDetail.portfolio"
+          />
+          <FundManagerInfo
+            v-if="modalType === 'manager'"
+            :fundManagers="fundDetail.fund_managers"
+          />
+        </div>
       </div>
     </div>
     
@@ -64,6 +124,9 @@ import FundChart from './FundChart.vue'
 import FundRankingTrend from './FundRankingTrend.vue'
 import FundAssetAllocation from './FundAssetAllocation.vue'
 import FundScaleChange from './FundScaleChange.vue'
+import FundManagerInfo from './FundManagerInfo.vue'
+import FundHolderStructure from './FundHolderStructure.vue'
+import FundPortfolio from './FundPortfolio.vue'
 import { fundAPI } from '../services/api'
 
 export default {
@@ -73,7 +136,10 @@ export default {
     FundChart,
     FundRankingTrend,
     FundAssetAllocation,
-    FundScaleChange
+    FundScaleChange,
+    FundManagerInfo,
+    FundHolderStructure,
+    FundPortfolio
   },
   props: {
     fundCode: {
@@ -86,6 +152,22 @@ export default {
     const fundDetail = ref(null)
     const loading = ref(false)
     const error = ref('')
+    const modalVisible = ref(false)
+    const modalType = ref('')
+
+    // 打开模态框
+    const openModal = (type) => {
+      modalType.value = type
+      modalVisible.value = true
+      document.body.style.overflow = 'hidden'
+    }
+
+    // 关闭模态框
+    const closeModal = () => {
+      modalVisible.value = false
+      modalType.value = ''
+      document.body.style.overflow = ''
+    }
 
     // 处理净值走势数据格式
     const processedNetWorthTrend = computed(() => {
@@ -95,14 +177,21 @@ export default {
         // 处理不同的数据格式
         const trend = fundDetail.value.net_worth_trend
         if (Array.isArray(trend) && trend.length > 0) {
-          // 格式1: [{x: timestamp, y: value}]
+          // 新格式: [{date: '2024-01-01', net_worth: 1.23}]
+          if (trend[0].date && trend[0].net_worth !== undefined) {
+            return trend.map(item => ({
+              x: new Date(item.date).getTime(),
+              y: parseFloat(item.net_worth) || 0
+            }))
+          }
+          // 旧格式1: [{x: timestamp, y: value}]
           if (trend[0].x && trend[0].y) {
             return trend.map(item => ({
               x: item.x,
               y: parseFloat(item.y) || 0
             }))
           }
-          // 格式2: [timestamp, value]
+          // 旧格式2: [timestamp, value]
           else if (Array.isArray(trend[0]) && trend[0].length >= 2) {
             return trend.map(item => ({
               x: item[0],
@@ -119,11 +208,19 @@ export default {
 
     // 处理累计净值走势数据
     const processedAcWorthTrend = computed(() => {
-      if (!fundDetail.value?.ac_worth_trend) return []
+      if (!fundDetail.value?.accumulated_net_worth) return []
       
       try {
-        const trend = fundDetail.value.ac_worth_trend
+        const trend = fundDetail.value.accumulated_net_worth
         if (Array.isArray(trend) && trend.length > 0) {
+          // 新格式: [{date: '2024-01-01', position_percentage: 1.23}]
+          if (trend[0].date !== undefined) {
+            return trend.map(item => [
+              new Date(item.date).getTime(),
+              parseFloat(item.position_percentage) || 0
+            ])
+          }
+          // 旧格式: [[timestamp, value]]
           return trend.map(item => {
             if (Array.isArray(item) && item.length >= 2) {
               return [item[0], parseFloat(item[1]) || 0]
@@ -186,7 +283,11 @@ export default {
       error,
       processedNetWorthTrend,
       processedAcWorthTrend,
-      retry
+      retry,
+      modalVisible,
+      modalType,
+      openModal,
+      closeModal
     }
   }
 }
@@ -196,30 +297,70 @@ export default {
 .fund-detail {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0;
+  padding: 0 16px;
+  background: #f0f2f5;
+  min-height: 100vh;
 }
 
-.detail-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+/* Dashboard 主布局 */
+.dashboard {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  padding: 16px 0;
 }
 
-/* 图表区域 */
-.charts-section {
+/* 左侧主区域 */
+.main-area {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  margin-bottom: 0;
+  gap: 16px;
+  min-width: 0;
 }
 
-/* 详细信息区域 */
-.detail-sections {
+/* 右侧边栏 */
+.sidebar {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  background: #f5f5f5;
-  padding: 24px;
+  gap: 16px;
+}
+
+/* 两列网格 */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* 卡片基础样式 */
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+/* 图表卡片 - 固定高度 */
+.card-chart {
+  height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 中等高度卡片 - 增加高度 */
+.card-md {
+  height: 450px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 侧边栏卡片 */
+.card-sidebar {
+  flex: 1;
+  min-height: 300px;
+  max-height: 480px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 加载状态 */
@@ -312,35 +453,145 @@ export default {
 }
 
 /* 响应式设计 */
-@media (max-width: 1024px) {
-  .fund-detail {
-    padding: 0;
+@media (max-width: 1400px) {
+  .dashboard {
+    grid-template-columns: 1fr 340px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .dashboard {
+    grid-template-columns: 1fr;
   }
   
-  .detail-sections {
-    padding: 16px;
+  .sidebar {
+    flex-direction: row;
+  }
+  
+  .card-sidebar {
+    flex: 1;
+    max-height: 400px;
+  }
+}
+
+@media (max-width: 900px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .card-md {
+    height: auto;
+    min-height: 320px;
+  }
+  
+  .sidebar {
+    flex-direction: column;
+  }
+  
+  .card-sidebar {
+    max-height: none;
   }
 }
 
 @media (max-width: 768px) {
   .fund-detail {
-    padding: 0;
+    padding: 0 8px;
   }
   
-  .detail-sections {
-    padding: 12px;
+  .dashboard {
+    gap: 12px;
+    padding: 12px 0;
   }
   
-  .empty-state {
-    padding: 60px 20px;
+  .main-area, .sidebar {
+    gap: 12px;
   }
   
-  .empty-icon {
-    font-size: 64px;
+  .grid-2 {
+    gap: 12px;
   }
-  
-  .empty-state p {
-    font-size: 16px;
+}
+
+/* 可点击卡片样式 */
+.clickable {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* 模态框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90vw;
+  max-width: 900px;
+  height: 80vh;
+  max-height: 700px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  animation: modalIn 0.3s ease;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
   }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #f0f0f0;
+  border-radius: 50%;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.2s;
+}
+
+.modal-close:hover {
+  background: #e0e0e0;
+}
+
+.modal-body {
+  flex: 1;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.modal-body > * {
+  height: 100%;
 }
 </style>

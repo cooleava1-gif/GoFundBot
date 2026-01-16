@@ -51,11 +51,11 @@
       </div>
       <div class="metric-item">
         <div class="metric-label">现费率</div>
-        <div class="metric-value rate">{{ fundInfo.fund_rate || fundInfo.fund_Rate ? (fundInfo.fund_rate || fundInfo.fund_Rate) + '%' : '--' }}</div>
+        <div class="metric-value rate">{{ formatRate(fundInfo.fund_rate) }}</div>
       </div>
       <div class="metric-item">
         <div class="metric-label">最小申购</div>
-        <div class="metric-value">{{ fundInfo.fund_minsg || fundInfo.fund_min_subscription ? (fundInfo.fund_minsg || fundInfo.fund_min_subscription) + '元' : '--' }}</div>
+        <div class="metric-value">{{ formatMinSubscription(fundInfo.fund_minsg) }}</div>
       </div>
     </div>
     
@@ -72,6 +72,11 @@ export default {
     fundCode: {
       type: String,
       required: true
+    },
+    // 新增：接收父组件传递的基金数据，避免重复请求
+    fundData: {
+      type: Object,
+      default: null
     }
   },
   data() {
@@ -81,25 +86,57 @@ export default {
     }
   },
   watch: {
+    // 监听父组件传递的数据
+    fundData: {
+      immediate: true,
+      handler(newData) {
+        if (newData) {
+          this.processFundData(newData)
+        }
+      }
+    },
     fundCode: {
       immediate: true,
       handler(newCode) {
-        if (newCode) {
+        // 只有在没有父组件传递数据时才自己请求
+        if (newCode && !this.fundData) {
           this.fetchFundInfo()
         }
       }
     }
   },
   methods: {
+    // 处理基金数据（可来自父组件传递或自己请求）
+    processFundData(data) {
+      const realtime = data.realtime_estimate || {}
+      this.fundInfo = {
+        ...data,
+        ...data.basic_info,
+        // 映射新字段名到模板使用的字段名
+        name: data.basic_info?.fund_name || realtime.name,
+        fund_rate: data.basic_info?.current_rate,
+        fund_Rate: data.basic_info?.current_rate,
+        fund_minsg: data.basic_info?.min_subscription_amount,
+        fund_min_subscription: data.basic_info?.min_subscription_amount,
+        // 映射业绩数据（新格式使用下划线分隔）
+        syl_1y: data.performance?.['1_month_return'],
+        syl_3y: data.performance?.['3_month_return'],
+        syl_6y: data.performance?.['6_month_return'],
+        syl_1n: data.performance?.['1_year_return'],
+        // 映射实时估值数据
+        dwjz: realtime.net_worth,          // 单位净值
+        jzrq: realtime.net_worth_date,     // 净值日期
+        gsz: realtime.estimate_value,       // 估算净值
+        gszzl: realtime.estimate_change,    // 估算涨跌幅
+        gztime: realtime.estimate_time      // 估值时间
+      }
+    },
     async fetchFundInfo() {
       this.loading = true
       try {
         const response = await fundAPI.getFundDetail(this.fundCode)
-        // 合并 basic_info 到主对象
-        this.fundInfo = {
-          ...response.data,
-          ...response.data.basic_info
-        }
+        const data = response.data
+        this.processFundData(data)
       } catch (error) {
         console.error('获取基金信息失败:', error)
         this.fundInfo = null
@@ -119,6 +156,24 @@ export default {
     formatTime(timeStr) {
       if (!timeStr) return '--'
       return timeStr
+    },
+    formatRate(value) {
+      // 处理费率显示：null/undefined/空值显示 '--'，数字显示带百分号
+      if (value === null || value === undefined || value === '') {
+        return '--'
+      }
+      const num = parseFloat(value)
+      if (isNaN(num)) {
+        return '--'
+      }
+      return num + '%'
+    },
+    formatMinSubscription(value) {
+      // 处理最小申购显示
+      if (value === null || value === undefined || value === '') {
+        return '--'
+      }
+      return value + '元'
     }
   }
 }

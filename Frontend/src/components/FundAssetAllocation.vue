@@ -6,28 +6,12 @@
     <div class="card-body">
       <div v-if="hasData" class="allocation-content">
         <div ref="chartEl" class="allocation-chart"></div>
-        <div class="allocation-table">
-          <table>
-            <thead>
-              <tr>
-                <th style="min-width: 100px;">时间</th>
-                <th v-for="(serie, index) in series" :key="index" style="text-align: center; min-width: 100px;">
-                  <div class="type-cell" style="justify-content: center;">
-                    <span class="type-dot" :style="{ background: getColor(index) }"></span>
-                    {{ serie.name }}
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(date, dateIndex) in categories" :key="dateIndex">
-                <td style="font-weight: bold;">{{ date }}</td>
-                <td v-for="(serie, index) in series" :key="index" class="value-cell">
-                  {{ formatValue(serie.data[dateIndex], serie.name) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="legend-info">
+          <div v-for="(serie, index) in displaySeries" :key="index" class="legend-item">
+            <span class="legend-dot" :style="{ background: getColor(index) }"></span>
+            <span class="legend-name">{{ serie.name }}</span>
+            <span class="legend-value">{{ formatValue(serie.data[serie.data.length - 1], serie.name) }}</span>
+          </div>
         </div>
       </div>
       <div v-else class="no-data">
@@ -180,10 +164,14 @@ export default {
       })
     }, { deep: true })
 
+    // 用于显示的系列（排除净资产）
+    const displaySeries = computed(() => series.value.filter(s => s.name !== '净资产'))
+
     return {
       chartEl,
       categories,
       series,
+      displaySeries,
       hasData,
       getColor,
       formatValue
@@ -194,89 +182,81 @@ export default {
 
 <style scoped>
 .asset-allocation-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  margin-bottom: 24px;
 }
 
 .card-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e8e8e8;
+  padding: 12px 16px;
+  flex-shrink: 0;
 }
 
 .card-header h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .card-body {
-  padding: 24px;
+  padding: 12px;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .allocation-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
+  height: 100%;
 }
 
 .allocation-chart {
   width: 100%;
-  height: 300px;
+  flex: 1;
+  min-height: 200px;
 }
 
-.allocation-table {
-  overflow-x: auto;
+.legend-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  padding: 8px 0;
 }
 
-.allocation-table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
 }
 
-.allocation-table th,
-.allocation-table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #e8e8e8;
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
-.allocation-table th {
-  background: #f5f5f5;
+.legend-name {
+  color: #666;
+}
+
+.legend-value {
   font-weight: 600;
   color: #333;
 }
 
-.type-cell {
+.no-data {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.type-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.value-cell {
-  font-weight: 500;
-  text-align: center;
-}
-
-.no-data {
-  text-align: center;
-  padding: 60px 20px;
+  justify-content: center;
+  height: 100%;
   color: #999;
-}
-
-.no-data p {
-  font-size: 16px;
 }
 </style>

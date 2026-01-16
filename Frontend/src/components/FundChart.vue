@@ -61,7 +61,7 @@
     </div>
 
     <div class="chart-container">
-      <div ref="chartEl" style="width: 100%; height: 350px;"></div>
+      <div ref="chartEl" class="chart-el"></div>
     </div>
 
     <div class="time-ranges">
@@ -153,6 +153,13 @@ export default {
             startDate = new Date(now.setFullYear(now.getFullYear() - 3))
         }
         
+        // 支持新格式: [{date: '2024-01-01', value: 1.23}]
+        if (data.length > 0 && data[0].date !== undefined) {
+            return data
+                .map(item => [new Date(item.date).getTime(), item.value])
+                .filter(item => item[0] >= startDate.getTime())
+        }
+        // 旧格式: [[timestamp, value]]
         return data.filter(item => item[0] >= startDate.getTime())
     }
 
@@ -454,15 +461,11 @@ export default {
 
 <style scoped>
 .fund-chart-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
-  padding-bottom: 10px;
-  position: relative;
-  min-height: 400px;
-  margin-bottom: 24px;
 }
 
 .top-tabs {
@@ -561,7 +564,15 @@ export default {
 .text-green { color: #52c41a; }
 
 .chart-container {
-  padding: 0 10px; 
+  padding: 0 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.chart-el {
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
 }
 
 .time-ranges {

@@ -87,8 +87,8 @@ export default {
         grid: {
           left: '3%',
           right: '4%',
-          bottom: '10%',
-          top: '10%',
+          bottom: '15%',
+          top: '18%',
           containLabel: true
         },
         xAxis: {
@@ -151,53 +151,60 @@ export default {
 
 <style scoped>
 .fund-scale-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  margin-bottom: 24px;
 }
 
 .card-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 16px 20px;
+  padding: 12px 16px;
+  flex-shrink: 0;
 }
 
 .card-header h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .card-body {
-  padding: 24px;
+  padding: 12px;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .scale-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
+  height: 100%;
 }
 
 .scale-chart {
   width: 100%;
-  height: 300px;
+  height: 240px;
+  flex-shrink: 0;
 }
 
 .scale-table {
-  overflow-x: auto;
+  flex: 1;
+  overflow: auto;
+  font-size: 12px;
 }
 
 .scale-table table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
 }
 
 .scale-table th,
 .scale-table td {
-  padding: 12px;
+  padding: 6px 8px;
   text-align: center;
   border-bottom: 1px solid #e8e8e8;
 }
@@ -206,6 +213,8 @@ export default {
   background: #f5f5f5;
   font-weight: 600;
   color: #333;
+  position: sticky;
+  top: 0;
 }
 
 .scale-value {
@@ -226,12 +235,10 @@ export default {
 }
 
 .no-data {
-  text-align: center;
-  padding: 60px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   color: #999;
-}
-
-.no-data p {
-  font-size: 16px;
 }
 </style>

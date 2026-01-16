@@ -10,7 +10,7 @@ PROJECT_ROOT = BACKEND_DIR.parent
 # 数据库路径：PROJECT_ROOT / Data / funds.db
 DATABASE_PATH = PROJECT_ROOT / "Data" / "funds.db"
 
-# 构造 SQLite URL（注意：Windows 和 Linux/macOS 都兼容）
+# 构造 SQLite URL
 DATABASE_URL = f"sqlite:///{DATABASE_PATH.as_posix()}"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
