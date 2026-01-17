@@ -96,7 +96,7 @@ export default {
         }
       })
 
-      return props.rateInSimilarType.map(item => {
+      const merged = props.rateInSimilarType.map(item => {
         // 新格式: {date, rank, total_funds}
         if (item.date !== undefined) {
           const timestamp = new Date(item.date).getTime()
@@ -117,6 +117,9 @@ export default {
           percent: percentMap.get(item.x) || 0
         }
       })
+
+      // 确保按时间升序，避免范围筛选/tooltip错位
+      return merged.slice().sort((a, b) => a.x - b.x)
     })
 
     // 根据时间范围过滤数据
@@ -176,7 +179,7 @@ export default {
           trigger: 'axis',
           formatter: (params) => {
             const dataIndex = params[0].dataIndex
-            const item = combinedData.value[dataIndex]
+            const item = filteredData.value[dataIndex]
             const defeated = ((1 - item.rank / item.total_funds) * 100).toFixed(2);
             return `
               <div style="font-weight: bold; margin-bottom: 8px;">${item.dateFormatted}</div>
