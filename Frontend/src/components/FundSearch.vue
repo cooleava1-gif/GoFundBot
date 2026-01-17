@@ -146,13 +146,16 @@ export default {
 <style scoped>
 .fund-search {
   margin-bottom: 20px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .search-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
@@ -165,10 +168,17 @@ export default {
 
 .search-input {
   flex: 1;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 16px;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .search-btn {
@@ -176,15 +186,16 @@ export default {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.3s;
+  font-size: 14px;
+  transition: all 0.2s;
 }
 
 .search-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .db-status {
@@ -192,10 +203,11 @@ export default {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #666;
-  background: #f5f7fa;
+  color: #6b7280;
+  background: #f9fafb;
   padding: 6px 12px;
   border-radius: 20px;
+  border: 1px solid #e5e7eb;
 }
 
 .status-text {
@@ -203,7 +215,7 @@ export default {
 }
 
 .status-empty {
-  color: #e74c3c;
+  color: #ef4444;
 }
 
 .update-btn {
@@ -235,7 +247,7 @@ export default {
 .spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid #ddd;
+  border: 2px solid #e5e7eb;
   border-top-color: #667eea;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -246,21 +258,23 @@ export default {
 }
 
 .search-results {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  max-height: 200px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  max-height: 240px;
   overflow-y: auto;
   background: white;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  margin-top: 10px;
 }
 
 .fund-item {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 12px;
+  transition: all 0.15s;
 }
 
 .fund-item:last-child {
@@ -268,32 +282,35 @@ export default {
 }
 
 .fund-item:hover {
-  background: #f5f7fa;
+  background: #f9fafb;
 }
 
 .fund-code {
-  font-weight: bold;
+  font-weight: 600;
   color: #667eea;
-  font-family: monospace;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 13px;
   min-width: 60px;
 }
 
 .fund-name {
   flex: 1;
-  color: #333;
+  color: #1f2937;
+  font-size: 14px;
 }
 
 .fund-type {
-  font-size: 12px;
-  color: #999;
-  background: #f0f0f0;
+  font-size: 11px;
+  color: #6b7280;
+  background: #f3f4f6;
   padding: 2px 8px;
   border-radius: 10px;
 }
 
 .loading {
   text-align: center;
-  padding: 10px;
-  color: #666;
+  padding: 12px;
+  color: #6b7280;
+  font-size: 14px;
 }
 </style>

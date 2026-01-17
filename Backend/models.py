@@ -74,3 +74,28 @@ class FundExtraData(Base):
     subscription_redemption_json = Column(Text)
     same_type_funds_json = Column(Text)
     updated_time = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class FundWatchlistGroup(Base):
+    """自选分组表"""
+    __tablename__ = 'fund_watchlist_group'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(50), nullable=False)
+    sort_order = Column(Integer, default=0)  # 分组排序
+    created_time = Column(DateTime, default=datetime.now)
+    updated_time = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class FundWatchlist(Base):
+    """基金自选表 - 存储用户自选的基金列表"""
+    __tablename__ = 'fund_watchlist'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fund_code = Column(String(6), unique=True, nullable=False)
+    fund_name = Column(String(100), nullable=False)
+    fund_type = Column(String(50))
+    group_id = Column(Integer, default=None)  # 所属分组ID，None表示未分组
+    sort_order = Column(Integer, default=0)  # 排序顺序，数字越小越靠前
+    created_time = Column(DateTime, default=datetime.now)
+    updated_time = Column(DateTime, default=datetime.now, onupdate=datetime.now)

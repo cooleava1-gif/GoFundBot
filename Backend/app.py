@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from database import init_db, get_db
-from models import FundBasicInfo, FundTrend, FundEstimate, FundPortfolio, FundExtraData
+from models import FundBasicInfo, FundTrend, FundEstimate, FundPortfolio, FundExtraData, FundWatchlist, FundWatchlistGroup
 from fund_api import FundAPI
 from fund_list_cache import get_fund_list_cache
 from sqlalchemy.orm import Session
@@ -305,6 +305,328 @@ def get_fund_trend(fund_code):
         })
 
     return jsonify({"error": "Fund trend data not found"}), 404
+
+
+# ==================== 自选基金 API ====================
+
+@app.route('/api/watchlist', methods=['GET'])
+def get_watchlist():
+    """获取自选基金列表（按分组和排序顺序）"""
+    db = next(get_db())
+    
+    # 获取所有分组
+    groups = db.query(FundWatchlistGroup).order_by(FundWatchlistGroup.sort_order).all()
+    
+    # 获取所有基金
+    watchlist = db.query(FundWatchlist).order_by(FundWatchlist.sort_order).all()
+    
+    # 构建分组数据
+    groups_data = []
+    for group in groups:
+        groups_data.append({
+            'id': group.id,
+            'name': group.name,
+            'sort_order': group.sort_order
+        })
+    
+    # 构建基金数据
+    funds_data = []
+    for item in watchlist:
+        estimate = db.query(FundEstimate).filter(FundEstimate.fund_code == item.fund_code).first()
+        
+        fund_data = {
+            'fund_code': item.fund_code,
+            'fund_name': item.fund_name,
+            'fund_type': item.fund_type,
+            'group_id': item.group_id,
+            'sort_order': item.sort_order,
+            'created_time': item.created_time.isoformat() if item.created_time else None,
+            'net_worth': estimate.net_worth if estimate else None,
+            'net_worth_date': estimate.net_worth_date if estimate else None,
+            'estimate_value': estimate.estimate_value if estimate else None,
+            'estimate_change': estimate.estimate_change if estimate else None,
+            'estimate_time': estimate.estimate_time if estimate else None
+        }
+        funds_data.append(fund_data)
+    
+    return jsonify({
+        'groups': groups_data,
+        'data': funds_data
+    })
+
+
+@app.route('/api/watchlist/<fund_code>', methods=['GET'])
+def check_watchlist(fund_code):
+    """检查基金是否在自选列表中"""
+    db = next(get_db())
+    exists = db.query(FundWatchlist).filter(FundWatchlist.fund_code == fund_code).first() is not None
+    return jsonify({'in_watchlist': exists})
+
+
+@app.route('/api/watchlist', methods=['POST'])
+def add_to_watchlist():
+    """添加基金到自选列表"""
+    data = request.get_json()
+    fund_code = data.get('fund_code')
+    fund_name = data.get('fund_name', '')
+    fund_type = data.get('fund_type', '')
+    group_id = data.get('group_id')  # 可选的分组ID
+    
+    if not fund_code:
+        return jsonify({'error': 'Fund code is required'}), 400
+    
+    db = next(get_db())
+    
+    # 检查是否已存在
+    existing = db.query(FundWatchlist).filter(FundWatchlist.fund_code == fund_code).first()
+    if existing:
+        return jsonify({'error': 'Fund already in watchlist', 'fund_code': fund_code}), 409
+    
+    # 获取当前最大排序值（在同一分组内）
+    query = db.query(FundWatchlist)
+    if group_id:
+        query = query.filter(FundWatchlist.group_id == group_id)
+    max_order = query.order_by(FundWatchlist.sort_order.desc()).first()
+    new_order = (max_order.sort_order + 1) if max_order else 0
+    
+    # 创建新记录
+    new_item = FundWatchlist(
+        fund_code=fund_code,
+        fund_name=fund_name,
+        fund_type=fund_type,
+        group_id=group_id,
+        sort_order=new_order
+    )
+    
+    try:
+        db.add(new_item)
+        db.commit()
+        return jsonify({
+            'message': 'Fund added to watchlist',
+            'fund_code': fund_code,
+            'sort_order': new_order
+        }), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/watchlist/<fund_code>', methods=['DELETE'])
+def remove_from_watchlist(fund_code):
+    """从自选列表移除基金"""
+    db = next(get_db())
+    
+    item = db.query(FundWatchlist).filter(FundWatchlist.fund_code == fund_code).first()
+    if not item:
+        return jsonify({'error': 'Fund not in watchlist'}), 404
+    
+    try:
+        db.delete(item)
+        db.commit()
+        return jsonify({'message': 'Fund removed from watchlist', 'fund_code': fund_code})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/watchlist/batch-delete', methods=['POST'])
+def batch_delete_from_watchlist():
+    """批量删除自选基金"""
+    data = request.get_json()
+    fund_codes = data.get('fund_codes', [])
+    
+    if not fund_codes:
+        return jsonify({'error': 'Fund codes are required'}), 400
+    
+    db = next(get_db())
+    
+    try:
+        deleted_count = db.query(FundWatchlist).filter(
+            FundWatchlist.fund_code.in_(fund_codes)
+        ).delete(synchronize_session=False)
+        db.commit()
+        return jsonify({
+            'message': f'Deleted {deleted_count} funds from watchlist',
+            'deleted_count': deleted_count
+        })
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/watchlist/reorder', methods=['PUT'])
+def reorder_watchlist():
+    """
+    更新自选基金排序
+    请求体格式: { "order": ["000001", "000002", "000003"], "group_id": 1 }
+    数组顺序即为排序顺序，索引值作为 sort_order
+    group_id 可选，用于同时更新基金的分组
+    """
+    data = request.get_json()
+    order = data.get('order', [])
+    group_id = data.get('group_id')  # 可选，移动到某个分组
+    
+    if not order:
+        return jsonify({'error': 'Order array is required'}), 400
+    
+    db = next(get_db())
+    
+    try:
+        for index, fund_code in enumerate(order):
+            update_data = {'sort_order': index}
+            if group_id is not None:
+                update_data['group_id'] = group_id if group_id > 0 else None
+            db.query(FundWatchlist).filter(
+                FundWatchlist.fund_code == fund_code
+            ).update(update_data)
+        db.commit()
+        return jsonify({'message': 'Watchlist reordered successfully'})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+# ==================== 分组管理 API ====================
+
+@app.route('/api/watchlist/groups', methods=['GET'])
+def get_groups():
+    """获取所有分组"""
+    db = next(get_db())
+    groups = db.query(FundWatchlistGroup).order_by(FundWatchlistGroup.sort_order).all()
+    
+    result = [{
+        'id': g.id,
+        'name': g.name,
+        'sort_order': g.sort_order
+    } for g in groups]
+    
+    return jsonify({'data': result})
+
+
+@app.route('/api/watchlist/groups', methods=['POST'])
+def create_group():
+    """创建新分组"""
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    
+    if not name:
+        return jsonify({'error': 'Group name is required'}), 400
+    
+    db = next(get_db())
+    
+    # 获取最大排序值
+    max_order = db.query(FundWatchlistGroup).order_by(FundWatchlistGroup.sort_order.desc()).first()
+    new_order = (max_order.sort_order + 1) if max_order else 0
+    
+    new_group = FundWatchlistGroup(name=name, sort_order=new_order)
+    
+    try:
+        db.add(new_group)
+        db.commit()
+        return jsonify({
+            'message': 'Group created',
+            'group': {
+                'id': new_group.id,
+                'name': new_group.name,
+                'sort_order': new_group.sort_order
+            }
+        }), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/watchlist/groups/<int:group_id>', methods=['PUT'])
+def update_group(group_id):
+    """更新分组（重命名）"""
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    
+    if not name:
+        return jsonify({'error': 'Group name is required'}), 400
+    
+    db = next(get_db())
+    group = db.query(FundWatchlistGroup).filter(FundWatchlistGroup.id == group_id).first()
+    
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+    
+    try:
+        group.name = name
+        db.commit()
+        return jsonify({'message': 'Group updated', 'group': {'id': group.id, 'name': group.name}})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/watchlist/groups/<int:group_id>', methods=['DELETE'])
+def delete_group(group_id):
+    """删除分组（分组内的基金会变为未分组）"""
+    db = next(get_db())
+    group = db.query(FundWatchlistGroup).filter(FundWatchlistGroup.id == group_id).first()
+    
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+    
+    try:
+        # 将该分组的基金设为未分组
+        db.query(FundWatchlist).filter(FundWatchlist.group_id == group_id).update({'group_id': None})
+        db.delete(group)
+        db.commit()
+        return jsonify({'message': 'Group deleted'})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/watchlist/groups/reorder', methods=['PUT'])
+def reorder_groups():
+    """更新分组排序"""
+    data = request.get_json()
+    order = data.get('order', [])  # [group_id1, group_id2, ...]
+    
+    if not order:
+        return jsonify({'error': 'Order array is required'}), 400
+    
+    db = next(get_db())
+    
+    try:
+        for index, group_id in enumerate(order):
+            db.query(FundWatchlistGroup).filter(
+                FundWatchlistGroup.id == group_id
+            ).update({'sort_order': index})
+        db.commit()
+        return jsonify({'message': 'Groups reordered successfully'})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/watchlist/move', methods=['PUT'])
+def move_fund_to_group():
+    """移动基金到指定分组"""
+    data = request.get_json()
+    fund_code = data.get('fund_code')
+    group_id = data.get('group_id')  # None 或 0 表示移到未分组
+    
+    if not fund_code:
+        return jsonify({'error': 'Fund code is required'}), 400
+    
+    db = next(get_db())
+    fund = db.query(FundWatchlist).filter(FundWatchlist.fund_code == fund_code).first()
+    
+    if not fund:
+        return jsonify({'error': 'Fund not in watchlist'}), 404
+    
+    try:
+        fund.group_id = group_id if group_id and group_id > 0 else None
+        db.commit()
+        return jsonify({'message': 'Fund moved successfully'})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

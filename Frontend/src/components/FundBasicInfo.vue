@@ -4,6 +4,17 @@
       <div class="header-left">
         <h2>{{ fundInfo.name || '未知基金' }}</h2>
         <span class="fund-code">{{ fundCode }}</span>
+        <!-- 自选按钮 -->
+        <button 
+          class="watchlist-btn" 
+          :class="{ 'in-watchlist': isInWatchlist }"
+          @click="toggleWatchlist"
+          :disabled="watchlistLoading"
+          :title="isInWatchlist ? '移除自选' : '添加自选'"
+        >
+          <span class="star-icon">{{ isInWatchlist ? '★' : '☆' }}</span>
+          <span class="btn-text">{{ isInWatchlist ? '已自选' : '自选' }}</span>
+        </button>
       </div>
       <div class="header-right">
         <div class="net-worth-box">
@@ -64,7 +75,7 @@
 </template>
 
 <script>
-import { fundAPI } from '../services/api'
+import { fundAPI, watchlistAPI } from '../services/api'
 
 export default {
   name: 'FundBasicInfo',
@@ -82,7 +93,9 @@ export default {
   data() {
     return {
       fundInfo: null,
-      loading: false
+      loading: false,
+      isInWatchlist: false,
+      watchlistLoading: false
     }
   },
   watch: {
@@ -102,10 +115,53 @@ export default {
         if (newCode && !this.fundData) {
           this.fetchFundInfo()
         }
+        // 检查自选状态
+        if (newCode) {
+          this.checkWatchlistStatus()
+        }
       }
     }
   },
   methods: {
+    // 检查是否在自选列表中
+    async checkWatchlistStatus() {
+      try {
+        const response = await watchlistAPI.checkInWatchlist(this.fundCode)
+        this.isInWatchlist = response.data.in_watchlist
+      } catch (error) {
+        console.error('检查自选状态失败:', error)
+        this.isInWatchlist = false
+      }
+    },
+    
+    // 切换自选状态
+    async toggleWatchlist() {
+      if (this.watchlistLoading || !this.fundCode) return
+      
+      this.watchlistLoading = true
+      try {
+        if (this.isInWatchlist) {
+          // 移除自选
+          await watchlistAPI.removeFromWatchlist(this.fundCode)
+          this.isInWatchlist = false
+        } else {
+          // 添加自选
+          const fundName = this.fundInfo?.name || this.fundInfo?.fund_name || this.fundCode
+          const fundType = this.fundInfo?.fund_type || ''
+          await watchlistAPI.addToWatchlist(this.fundCode, fundName, fundType)
+          this.isInWatchlist = true
+        }
+      } catch (error) {
+        console.error('操作自选失败:', error)
+        // 如果是已存在的错误，说明实际上已经在自选中了
+        if (error.response?.status === 409) {
+          this.isInWatchlist = true
+        }
+      } finally {
+        this.watchlistLoading = false
+      }
+    },
+    
     // 处理基金数据（可来自父组件传递或自己请求）
     processFundData(data) {
       const realtime = data.realtime_estimate || {}
@@ -202,6 +258,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .header-left h2 {
@@ -215,6 +272,50 @@ export default {
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 14px;
+  font-weight: 500;
+}
+
+/* 自选按钮样式 */
+.watchlist-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.watchlist-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.watchlist-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.watchlist-btn.in-watchlist {
+  background: rgba(255, 215, 0, 0.3);
+  border-color: #ffd700;
+}
+
+.watchlist-btn.in-watchlist:hover:not(:disabled) {
+  background: rgba(255, 215, 0, 0.4);
+}
+
+.star-icon {
+  font-size: 16px;
+  color: #ffd700;
+}
+
+.btn-text {
   font-weight: 500;
 }
 

@@ -41,4 +41,84 @@ export const fundAPI = {
   }
 }
 
+// ==================== 自选基金 API ====================
+export const watchlistAPI = {
+  // 获取自选列表（包含分组信息）
+  getWatchlist() {
+    return api.get('/watchlist')
+  },
+  
+  // 检查基金是否在自选列表中
+  checkInWatchlist(fundCode) {
+    return api.get(`/watchlist/${fundCode}`)
+  },
+  
+  // 添加基金到自选
+  addToWatchlist(fundCode, fundName, fundType = '', groupId = null) {
+    return api.post('/watchlist', {
+      fund_code: fundCode,
+      fund_name: fundName,
+      fund_type: fundType,
+      group_id: groupId
+    })
+  },
+  
+  // 从自选中移除
+  removeFromWatchlist(fundCode) {
+    return api.delete(`/watchlist/${fundCode}`)
+  },
+  
+  // 批量删除
+  batchDelete(fundCodes) {
+    return api.post('/watchlist/batch-delete', {
+      fund_codes: fundCodes
+    })
+  },
+  
+  // 更新排序 - 传入基金代码数组，顺序即为排序
+  reorder(fundCodeOrder, groupId = null) {
+    return api.put('/watchlist/reorder', {
+      order: fundCodeOrder,
+      group_id: groupId
+    })
+  },
+  
+  // 移动基金到分组
+  moveFundToGroup(fundCode, groupId) {
+    return api.put('/watchlist/move', {
+      fund_code: fundCode,
+      group_id: groupId
+    })
+  },
+  
+  // ==================== 分组 API ====================
+  
+  // 获取所有分组
+  getGroups() {
+    return api.get('/watchlist/groups')
+  },
+  
+  // 创建分组
+  createGroup(name) {
+    return api.post('/watchlist/groups', { name })
+  },
+  
+  // 重命名分组
+  renameGroup(groupId, name) {
+    return api.put(`/watchlist/groups/${groupId}`, { name })
+  },
+  
+  // 删除分组
+  deleteGroup(groupId) {
+    return api.delete(`/watchlist/groups/${groupId}`)
+  },
+  
+  // 分组排序
+  reorderGroups(groupIdOrder) {
+    return api.put('/watchlist/groups/reorder', {
+      order: groupIdOrder
+    })
+  }
+}
+
 export default api

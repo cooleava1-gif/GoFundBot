@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from models import Base
 from pathlib import Path
@@ -16,10 +16,27 @@ DATABASE_URL = f"sqlite:///{DATABASE_PATH.as_posix()}"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+def migrate_db():
+    """数据库迁移：为现有表添加缺失的列"""
+    with engine.connect() as conn:
+        # 检查并添加 fund_watchlist.group_id 列
+        try:
+            result = conn.execute(text("PRAGMA table_info(fund_watchlist)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'group_id' not in columns:
+                conn.execute(text("ALTER TABLE fund_watchlist ADD COLUMN group_id INTEGER DEFAULT NULL"))
+                conn.commit()
+                print("Migration: Added group_id column to fund_watchlist table")
+        except Exception as e:
+            print(f"Migration check for fund_watchlist: {e}")
+
 def init_db():
     # 确保 Data 目录存在
     (PROJECT_ROOT / "Data").mkdir(exist_ok=True)
+    # 创建所有表（新表会被创建，已有表不会被覆盖）
     Base.metadata.create_all(bind=engine)
+    # 执行数据库迁移
+    migrate_db()
 
 def get_db():
     db = SessionLocal()
