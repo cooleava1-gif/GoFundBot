@@ -7,11 +7,142 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # 获取项目根目录下的 Data 文件夹路径
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, 'Data')
+
+
+class FundRankingFetcher:
+    """基金排行榜数据获取器"""
+    
+    def __init__(self):
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://fund.eastmoney.com/data/fundranking.html'
+        }
+    
+    def fetch_fund_ranking(self, fund_type: str = 'all', page: int = 1, page_size: int = 50) -> Dict[str, Any]:
+        """
+        获取基金排行榜数据
+        fund_type: 基金类型 'all', 'gp'(股票), 'hh'(混合), 'zq'(债券), 'zs'(指数), 'qdii', 'lof', 'fof'
+        返回包含收益率、排名等完整数据的基金列表
+        """
+        # 天天基金排行榜API
+        # ft: 基金类型，sc: 排序字段，st: 排序方式(desc/asc)，pi: 页码，pn: 每页数量
+        url = "https://fund.eastmoney.com/data/rankhandler.aspx"
+        
+        # 基金类型映射
+        type_map = {
+            'all': '',
+            'gp': 'gp',      # 股票型
+            'hh': 'hh',      # 混合型
+            'zq': 'zq',      # 债券型
+            'zs': 'zs',      # 指数型
+            'qdii': 'qdii',
+            'lof': 'lof',
+            'fof': 'fof'
+        }
+        
+        params = {
+            'op': 'ph',
+            'dt': 'kf',  # 开放式基金
+            'ft': type_map.get(fund_type, ''),
+            'rs': '',
+            'gs': 0,
+            'sc': '1nzf',  # 按1年收益率排序
+            'st': 'desc',
+            'sd': '',
+            'ed': '',
+            'qdii': '',
+            'tabSubtype': ',,,,,',
+            'pi': page,
+            'pn': page_size,
+            'dx': 1,
+            'v': datetime.now().strftime('%Y%m%d%H%M%S')
+        }
+        
+        try:
+            response = requests.get(url, params=params, headers=self.headers, timeout=30)
+            if response.status_code != 200:
+                return {'success': False, 'error': f'请求失败: {response.status_code}'}
+            
+            content = response.text
+            
+            # 解析返回数据
+            # 格式: var rankData = {datas:[...],allRecords:1234,...}
+            match = re.search(r'var rankData\s*=\s*(\{.*?\});', content, re.DOTALL)
+            if not match:
+                return {'success': False, 'error': '无法解析返回数据'}
+            
+            # 将JS对象转换为JSON (处理无引号的键名)
+            js_obj = match.group(1)
+            # 为键名添加引号
+            json_str = re.sub(r'(\w+):', r'"\1":', js_obj)
+            # 处理可能的单引号
+            json_str = json_str.replace("'", '"')
+            
+            data = json.loads(json_str)
+            
+            # 解析基金数据
+            funds = []
+            datas = data.get('datas', [])
+            
+            for item in datas:
+                # 数据格式: "基金代码,基金名称,简称,日期,单位净值,累计净值,日涨幅,近1周,近1月,近3月,近6月,近1年,近2年,近3年,今年以来,成立以来,手续费,..."
+                parts = item.split(',')
+                if len(parts) >= 17:
+                    fund = {
+                        'fund_code': parts[0],
+                        'fund_name': parts[1],
+                        'short_name': parts[2],
+                        'date': parts[3],
+                        'net_worth': self._parse_float(parts[4]),
+                        'accumulated_net_worth': self._parse_float(parts[5]),
+                        'daily_change': self._parse_float(parts[6]),
+                        'return_1w': self._parse_float(parts[7]),
+                        'return_1m': self._parse_float(parts[8]),
+                        'return_3m': self._parse_float(parts[9]),
+                        'return_6m': self._parse_float(parts[10]),
+                        'return_1y': self._parse_float(parts[11]),
+                        'return_2y': self._parse_float(parts[12]),
+                        'return_3y': self._parse_float(parts[13]),
+                        'return_ytd': self._parse_float(parts[14]),
+                        'return_since_inception': self._parse_float(parts[15]),
+                        'fee': parts[16] if len(parts) > 16 else None
+                    }
+                    funds.append(fund)
+            
+            return {
+                'success': True,
+                'total': data.get('allRecords', len(funds)),
+                'page': page,
+                'page_size': page_size,
+                'funds': funds
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def _parse_float(self, value: str) -> Optional[float]:
+        """解析浮点数"""
+        if not value or value in ['', '--', '-']:
+            return None
+        try:
+            return float(value)
+        except:
+            return None
+    
+    def get_fund_basic_ranking_data(self, fund_code: str) -> Optional[Dict[str, Any]]:
+        """
+        获取单只基金的排行榜基础数据
+        通过遍历排行榜查找特定基金（效率较低，建议批量获取后缓存）
+        """
+        # 这里可以实现单只基金的查询，但效率较低
+        # 建议使用批量获取后在内存中查找
+        pass
+
 
 class FundListCache:
     """基金列表本地缓存"""

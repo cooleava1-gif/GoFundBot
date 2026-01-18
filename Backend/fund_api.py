@@ -73,6 +73,18 @@ class FundDataCleaner:
                         'equity_return': item.get('equityReturn'),
                         'dividend': item.get('unitMoney')
                     })
+            
+            # 过滤首日异常数据（如面值1.0与实际净值100+差异巨大）
+            # 新成立ETF常常第一天显示面值1.0，第二天显示实际参考净值(如100)，导致计算涨幅异常
+            if len(cleaned) >= 2:
+                try:
+                    v0 = float(cleaned[0]['net_worth'])
+                    v1 = float(cleaned[1]['net_worth'])
+                    if v0 > 0 and abs((v1 - v0) / v0) > 0.5:
+                        cleaned.pop(0)
+                except (ValueError, TypeError):
+                    pass
+            
             return cleaned
             
         elif data_type == 'position':
@@ -123,10 +135,17 @@ class FundDataCleaner:
     
     def clean_fund_info(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """清洗基金基本信息"""
+        fund_code = self.clean_js_variable(raw_data.get('fS_code'))
+        
+        # 尝试从本地缓存中获取基金类型
+        fund_type = raw_data.get('fund_type_from_cache')
+        if not fund_type:
+            fund_type = '混合型'  # 默认值
+        
         info = {
             'fund_name': self.clean_js_variable(raw_data.get('fS_name')),
-            'fund_code': self.clean_js_variable(raw_data.get('fS_code')),
-            'fund_type': '混合型',
+            'fund_code': fund_code,
+            'fund_type': fund_type,
             'original_rate': self.clean_rate(raw_data.get('fund_sourceRate')),
             'current_rate': self.clean_rate(raw_data.get('fund_Rate')),
             'min_subscription_amount': self.clean_js_variable(raw_data.get('fund_minsg')),
@@ -318,6 +337,31 @@ class FundAPI:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         self.cleaner = FundDataCleaner()
+        self._fund_type_cache = None  # 基金类型缓存
+    
+    def _load_fund_type_cache(self):
+        """加载基金类型缓存"""
+        if self._fund_type_cache is not None:
+            return self._fund_type_cache
+        
+        try:
+            import os
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            cache_path = os.path.join(base_dir, 'Data', 'fund_list_cache.json')
+            
+            if os.path.exists(cache_path):
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    funds = data.get('funds', [])
+                    # 构建 fund_code -> fund_type 的映射
+                    self._fund_type_cache = {f.get('CODE'): f.get('TYPE') for f in funds if f.get('CODE')}
+            else:
+                self._fund_type_cache = {}
+        except Exception as e:
+            print(f"Error loading fund type cache: {e}")
+            self._fund_type_cache = {}
+        
+        return self._fund_type_cache
 
     def get_fund_data(self, fund_code: str) -> Union[Dict[str, Any], None]:
         """
@@ -327,6 +371,12 @@ class FundAPI:
         raw_data = self._fetch_raw_data(fund_code)
         if not raw_data:
             return None
+        
+        # 从本地缓存获取基金类型
+        fund_type_cache = self._load_fund_type_cache()
+        fund_type = fund_type_cache.get(fund_code, '')
+        if fund_type:
+            raw_data['fund_type_from_cache'] = fund_type
         
         # 使用 cleaner 清洗数据
         try:

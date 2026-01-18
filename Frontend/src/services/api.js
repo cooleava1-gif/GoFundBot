@@ -127,4 +127,52 @@ export const watchlistAPI = {
   }
 }
 
+// ==================== 基金筛选 API ====================
+export const screeningAPI = {
+  // 获取筛选数据库状态
+  getStatus() {
+    return api.get('/screening/status')
+  },
+  
+  // 启动数据更新（直接获取完整数据）
+  startUpdate(options = {}) {
+    return api.post('/screening/update', options)
+  },
+  
+  // 停止更新
+  stopUpdate() {
+    return api.post('/screening/stop')
+  },
+  
+  // 查询筛选基金
+  query(params) {
+    return api.post('/screening/query', params)
+  },
+  
+  // 获取预设策略列表
+  getStrategies() {
+    return api.get('/screening/strategies')
+  },
+  
+  // 获取可用的基金类型（根据当前筛选条件）
+  getAvailableTypes(params) {
+    return api.post('/screening/available-types', params)
+  },
+  
+  // 获取单只基金筛选详情
+  getFundDetail(fundCode) {
+    return api.get(`/screening/fund/${fundCode}`)
+  },
+  
+  // 更新单只基金筛选数据
+  updateSingleFund(fundCode) {
+    return api.post(`/screening/update-single/${fundCode}`)
+  },
+  
+  // 重新计算同类型排名
+  recalculateRankings() {
+    return api.post('/screening/recalculate-rankings')
+  }
+}
+
 export default api

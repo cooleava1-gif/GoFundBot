@@ -19,6 +19,13 @@
             </button>
             <button 
               class="mode-btn" 
+              :class="{ active: viewMode === 'screening' }"
+              @click="viewMode = 'screening'"
+            >
+              🔍 基金筛选
+            </button>
+            <button 
+              class="mode-btn" 
               :class="{ active: viewMode === 'compare' }"
               @click="viewMode = 'compare'"
             >
@@ -31,8 +38,8 @@
     
     <main class="app-main">
       <div class="main-layout">
-        <!-- 左侧：自选列表 -->
-        <aside class="sidebar-left">
+        <!-- 左侧：自选列表 (非筛选模式显示) -->
+        <aside class="sidebar-left" v-if="viewMode !== 'screening'">
           <FundWatchlist 
             @view-fund="handleFundSelected" 
             @add-to-compare="handleAddToCompare"
@@ -42,9 +49,17 @@
         </aside>
         
         <!-- 右侧：根据模式显示不同内容 -->
-        <div class="content-area">
+        <div class="content-area" :class="{ 'full-width': viewMode === 'screening' }">
+          <!-- 筛选模式 -->
+          <template v-if="viewMode === 'screening'">
+            <FundScreening 
+              @view-fund="handleScreeningFundView"
+              @add-to-compare="handleAddToCompare"
+            />
+          </template>
+          
           <!-- 对比模式 -->
-          <template v-if="viewMode === 'compare'">
+          <template v-else-if="viewMode === 'compare'">
             <FundComparison 
               :compareFunds="compareFunds"
               @remove-fund="handleRemoveFromCompare"
@@ -78,6 +93,7 @@ import FundSearch from './components/FundSearch.vue'
 import FundDetail from './components/FundDetail.vue'
 import FundWatchlist from './components/FundWatchlist.vue'
 import FundComparison from './components/FundComparison.vue'
+import FundScreening from './components/FundScreening.vue'
 
 export default {
   name: 'App',
@@ -85,16 +101,23 @@ export default {
     FundSearch,
     FundDetail,
     FundWatchlist,
-    FundComparison
+    FundComparison,
+    FundScreening
   },
   setup() {
     const selectedFundCode = ref('')
     const currentTime = ref('')
-    const viewMode = ref('detail') // 'detail' 或 'compare'
+    const viewMode = ref('detail') // 'detail', 'screening' 或 'compare'
     const compareFunds = ref([]) // 用于对比的基金列表
     
     const handleFundSelected = (fundCode) => {
       selectedFundCode.value = fundCode
+    }
+    
+    // 从筛选页面查看基金详情
+    const handleScreeningFundView = (fundCode) => {
+      selectedFundCode.value = fundCode
+      viewMode.value = 'detail'
     }
     
     // 添加基金到对比列表
@@ -144,6 +167,7 @@ export default {
       viewMode,
       compareFunds,
       handleFundSelected,
+      handleScreeningFundView,
       handleAddToCompare,
       handleRemoveFromCompare,
       handleClearCompare
@@ -255,6 +279,10 @@ export default {
 .content-area {
   flex: 1;
   min-width: 0;
+}
+
+.content-area.full-width {
+  width: 100%;
 }
 
 .welcome {

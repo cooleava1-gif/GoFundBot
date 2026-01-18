@@ -1,13 +1,19 @@
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from database import init_db, SessionLocal
-from models import FundBasicInfo, FundTrend, FundEstimate, FundPortfolio, FundExtraData, FundWatchlist, FundWatchlistGroup, FundRiskMetrics
+from models import (FundBasicInfo, FundTrend, FundEstimate, FundPortfolio, 
+                    FundExtraData, FundWatchlist, FundWatchlistGroup, 
+                    FundRiskMetrics, FundScreeningRank)
 from fund_api import FundAPI
 from fund_list_cache import get_fund_list_cache
 from sqlalchemy.orm import Session
+from sqlalchemy import desc, asc, and_, or_, func
 from datetime import datetime, timedelta
 import json
 import math
+import threading
+import time
+import re
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -126,7 +132,14 @@ def update_search_database():
 
 @app.route('/api/fund/<fund_code>', methods=['GET'])
 def get_fund_detail(fund_code):
-    """获取基金详细信息"""
+    """
+    获取基金详细信息
+    
+    数据一致性策略：
+    - 每次访问都从API获取最新数据
+    - 同时更新所有相关表（FundBasicInfo, FundTrend, FundRiskMetrics等）
+    - 确保详情、对比、筛选三个模块的数据源统一
+    """
     if not fund_code:
         return jsonify({"error": "Fund code is required"}), 400    
     db = get_db() # 获取数据库会话
@@ -258,6 +271,15 @@ def get_fund_detail(fund_code):
                 same_type_funds_json=_json_dumps(extra['same_type_funds'])
             )
             db.add(extra_record)
+
+        # 【数据一致性】同时更新风险指标，确保详情/对比/筛选数据统一
+        net_worth_trend = fund_data.get('net_worth_trend', [])
+        if net_worth_trend and len(net_worth_trend) >= 30:
+            risk_metrics = calculate_risk_metrics(net_worth_trend)
+            if risk_metrics:
+                _save_risk_metrics(db, fund_code, risk_metrics)
+                # 将风险指标也附加到返回数据中
+                fund_data['risk_metrics'] = risk_metrics
 
         try:
             db.commit()
@@ -662,6 +684,15 @@ def calculate_risk_metrics(net_worth_trend):
             dates.append(item.get('date'))
             values.append(float(item.get('net_worth')))
     
+    # 过滤首日异常数据（如面值1.0与实际净值100+差异巨大）
+    # 这种情况会导致波动率和回撤计算极其离谱
+    if len(values) >= 2:
+        v0 = values[0]
+        v1 = values[1]
+        if v0 > 0 and abs((v1 - v0) / v0) > 0.5:
+            values.pop(0)
+            dates.pop(0)
+    
     if len(values) < 30:
         return None
     
@@ -744,18 +775,49 @@ def calculate_risk_metrics(net_worth_trend):
         result[f'max_drawdown_{period}'] = calc_max_drawdown(period_values)
     
     # 计算1年和3年的年化收益率、波动率、夏普比率
+    # 重要：对于数据不足的周期，不计算指标（返回None），避免年化放大产生误导性数据
+    min_trading_days = {
+        '1y': 200,  # 至少200个交易日才计算1年期指标（约10个月）
+        '3y': 600,  # 至少600个交易日才计算3年期指标（约2.5年）
+    }
+    
     for period, months in [('1y', 12), ('3y', 36)]:
         period_values, period_dates = get_period_data(months)
         trading_days = len(period_values)
+        
+        # 检查数据是否充足
+        min_days = min_trading_days.get(period, 30)
+        if trading_days < min_days:
+            # 数据不足，不计算该周期的指标
+            result[f'annual_return_{period}'] = None
+            result[f'volatility_{period}'] = None
+            result[f'sharpe_ratio_{period}'] = None
+            result[f'calmar_ratio_{period}'] = None
+            continue
         
         daily_returns = calc_daily_returns(period_values)
         annual_return = calc_annual_return(period_values, trading_days)
         volatility = calc_volatility(daily_returns)
         sharpe = calc_sharpe_ratio(annual_return, volatility)
         
+        # 额外检查：如果波动率异常大（>500%），说明数据有问题，放弃该计算结果
+        if volatility is not None and volatility > 500:
+            result[f'annual_return_{period}'] = None
+            result[f'volatility_{period}'] = None
+            result[f'sharpe_ratio_{period}'] = None
+            result[f'calmar_ratio_{period}'] = None
+            continue
+        
         result[f'annual_return_{period}'] = annual_return
         result[f'volatility_{period}'] = volatility
         result[f'sharpe_ratio_{period}'] = sharpe
+        
+        # 计算卡玛比率
+        max_dd = result.get(f'max_drawdown_{period}')
+        if annual_return is not None and max_dd is not None and max_dd > 0:
+            result[f'calmar_ratio_{period}'] = round(annual_return / max_dd, 2)
+        else:
+            result[f'calmar_ratio_{period}'] = None
     
     return result
 
@@ -772,6 +834,12 @@ def get_fund_compare_data(fund_code):
     """
     获取基金对比数据，优先使用数据库缓存（1周内）
     返回完整的基金详情数据和风险指标
+    
+    数据来源（统一）：
+    - 基本信息、业绩: FundBasicInfo
+    - 走势数据: FundTrend
+    - 扩展数据: FundExtraData
+    - 风险指标: FundRiskMetrics
     """
     db = get_db()
     force_refresh = request.args.get('refresh', 'false').lower() == 'true'
@@ -797,6 +865,10 @@ def get_fund_compare_data(fund_code):
                     is_data_fresh(risk_record.updated_time, days=7) and
                     risk_record.sharpe_ratio_1y is not None
                 )
+
+                # 额外检查：如果波动率异常大（>1000%），说明之前计算时受到了脏数据影响，需要重算
+                if risk_data_valid and risk_record.volatility_1y and risk_record.volatility_1y > 1000:
+                    risk_data_valid = False
                 
                 if risk_data_valid:
                     data['risk_metrics'] = {
@@ -811,6 +883,8 @@ def get_fund_compare_data(fund_code):
                         'volatility_3y': risk_record.volatility_3y,
                         'annual_return_1y': risk_record.annual_return_1y,
                         'annual_return_3y': risk_record.annual_return_3y,
+                        'calmar_ratio_1y': risk_record.calmar_ratio_1y,
+                        'calmar_ratio_3y': risk_record.calmar_ratio_3y,
                     }
                 else:
                     # 风险指标缺失，从缓存的净值数据计算
@@ -818,17 +892,8 @@ def get_fund_compare_data(fund_code):
                     risk_metrics = calculate_risk_metrics(net_worth_trend)
                     
                     if risk_metrics:
-                        # 保存到数据库
-                        if risk_record:
-                            for key, value in risk_metrics.items():
-                                setattr(risk_record, key, value)
-                            risk_record.updated_time = datetime.now()
-                        else:
-                            risk_record = FundRiskMetrics(
-                                fund_code=fund_code,
-                                **risk_metrics
-                            )
-                            db.add(risk_record)
+                        # 保存到 FundRiskMetrics
+                        _save_risk_metrics(db, fund_code, risk_metrics)
                         db.commit()
                         data['risk_metrics'] = risk_metrics
                     else:
@@ -845,7 +910,6 @@ def get_fund_compare_data(fund_code):
             if trend_record:
                 data = _build_cached_response(db, fund_code)
                 if data:
-                    # 即使API失败，也尝试计算风险指标
                     if risk_record and risk_record.sharpe_ratio_1y is not None:
                         data['risk_metrics'] = {
                             'max_drawdown_3m': risk_record.max_drawdown_3m,
@@ -859,20 +923,14 @@ def get_fund_compare_data(fund_code):
                             'volatility_3y': risk_record.volatility_3y,
                             'annual_return_1y': risk_record.annual_return_1y,
                             'annual_return_3y': risk_record.annual_return_3y,
+                            'calmar_ratio_1y': risk_record.calmar_ratio_1y,
+                            'calmar_ratio_3y': risk_record.calmar_ratio_3y,
                         }
                     else:
-                        # 从缓存净值数据计算
                         net_worth_trend = data.get('net_worth_trend', [])
                         risk_metrics = calculate_risk_metrics(net_worth_trend)
                         if risk_metrics:
-                            # 保存到数据库
-                            if risk_record:
-                                for key, value in risk_metrics.items():
-                                    setattr(risk_record, key, value)
-                                risk_record.updated_time = datetime.now()
-                            else:
-                                risk_record = FundRiskMetrics(fund_code=fund_code, **risk_metrics)
-                                db.add(risk_record)
+                            _save_risk_metrics(db, fund_code, risk_metrics)
                             db.commit()
                         data['risk_metrics'] = risk_metrics or {}
                     data['data_source'] = 'stale_cache'
@@ -883,22 +941,11 @@ def get_fund_compare_data(fund_code):
         net_worth_trend = api_data.get('net_worth_trend', [])
         risk_metrics = calculate_risk_metrics(net_worth_trend)
         
-        # 保存到数据库
+        # 保存到数据库（所有相关表）
         _save_fund_data_to_db(db, fund_code, api_data)
-        
-        # 保存风险指标
         if risk_metrics:
-            if risk_record:
-                for key, value in risk_metrics.items():
-                    setattr(risk_record, key, value)
-                risk_record.updated_time = datetime.now()
-            else:
-                risk_record = FundRiskMetrics(
-                    fund_code=fund_code,
-                    **risk_metrics
-                )
-                db.add(risk_record)
-            db.commit()
+            _save_risk_metrics(db, fund_code, risk_metrics)
+        db.commit()
         
         # 返回数据
         api_data['risk_metrics'] = risk_metrics or {}
@@ -910,6 +957,25 @@ def get_fund_compare_data(fund_code):
         db.rollback()
         return jsonify({'error': str(e)}), 500
 
+
+def _save_risk_metrics(db: Session, fund_code: str, risk_metrics: dict):
+    """保存风险指标到 FundRiskMetrics 表"""
+    if not risk_metrics:
+        return
+    
+    risk_record = db.query(FundRiskMetrics).filter(FundRiskMetrics.fund_code == fund_code).first()
+    
+    if risk_record:
+        for key, value in risk_metrics.items():
+            if hasattr(risk_record, key):
+                setattr(risk_record, key, value)
+        risk_record.updated_time = datetime.now()
+    else:
+        risk_record = FundRiskMetrics(
+            fund_code=fund_code,
+            **{k: v for k, v in risk_metrics.items() if hasattr(FundRiskMetrics, k)}
+        )
+        db.add(risk_record)
 
 
 def _save_fund_data_to_db(db: Session, fund_code: str, data: dict):
@@ -984,6 +1050,849 @@ def _save_fund_data_to_db(db: Session, fund_code: str, data: dict):
     except Exception as e:
         db.rollback()
         print(f"Error saving fund data to db: {e}")
+
+
+# ==================== 基金筛选功能 ====================
+
+# 全局变量：批量更新状态
+screening_update_status = {
+    'running': False,
+    'progress': 0,
+    'total': 0,
+    'current_fund': '',
+    'success_count': 0,
+    'fail_count': 0,
+    'start_time': None,
+    'message': ''
+}
+
+
+def calculate_calmar_ratio(annual_return, max_drawdown):
+    """计算卡玛比率"""
+    if max_drawdown is None or max_drawdown == 0 or annual_return is None:
+        return None
+    return round(annual_return / max_drawdown, 2)
+
+
+def check_4433_rule(rank_1y, rank_2y, rank_3y, rank_5y, rank_6m, rank_3m):
+    """
+    检查是否符合4433法则
+    4433法则：
+    - 近1年、2年、3年、5年排名在同类前1/4 (25%)
+    - 近6个月、3个月排名在前1/3 (33.33%)
+    注意：这里的排名应该是同类型基金中的排名百分位
+    """
+    # 长期排名：1年必须有，2年3年至少有一个
+    if rank_1y is None or rank_1y > 25:
+        return False
+    
+    # 检查2年和3年排名（如果有数据）
+    long_term_available = [r for r in [rank_2y, rank_3y] if r is not None]
+    if long_term_available:
+        for rank in long_term_available:
+            if rank > 25:
+                return False
+    
+    # 如果有5年数据，也需要在前25%
+    if rank_5y is not None and rank_5y > 25:
+        return False
+    
+    # 短期排名：6个月和3个月都必须在前33.33%
+    if rank_6m is None or rank_6m > 33.33:
+        return False
+    if rank_3m is None or rank_3m > 33.33:
+        return False
+    
+    return True
+
+
+# ==================== 基金筛选功能 ====================
+
+def check_4433_rule(rank_1y, rank_2y, rank_3y, rank_5y, rank_6m, rank_3m):
+    """
+    检查是否符合4433法则
+    4433法则：
+    - 近1年、2年、3年排名在同类前1/4 (25%)
+    - 近6个月、3个月排名在前1/3 (33.33%)
+    """
+    # 长期排名：1年必须有，2年3年至少有一个
+    if rank_1y is None or rank_1y > 25:
+        return False
+    
+    # 检查2年和3年排名（如果有数据）
+    long_term_available = [r for r in [rank_2y, rank_3y] if r is not None]
+    if long_term_available:
+        for rank in long_term_available:
+            if rank > 25:
+                return False
+    
+    # 如果有5年数据，也需要在前25%
+    if rank_5y is not None and rank_5y > 25:
+        return False
+    
+    # 短期排名：6个月和3个月都必须在前33.33%
+    if rank_6m is None or rank_6m > 33.33:
+        return False
+    if rank_3m is None or rank_3m > 33.33:
+        return False
+    
+    return True
+
+
+def calculate_same_type_rankings(db):
+    """
+    计算同类型基金的排名百分位
+    基于 FundBasicInfo 中的收益数据计算排名，保存到 FundScreeningRank
+    """
+    # 获取所有有效的基金类型
+    fund_types = db.query(FundBasicInfo.fund_type).filter(
+        FundBasicInfo.fund_type.isnot(None),
+        FundBasicInfo.fund_type != ''
+    ).distinct().all()
+    
+    fund_types = [ft[0] for ft in fund_types]
+    print(f"[同类排名] 发现 {len(fund_types)} 种基金类型")
+    
+    for fund_type in fund_types:
+        # 获取该类型的所有基金（包含业绩数据）
+        funds = db.query(FundBasicInfo).filter(
+            FundBasicInfo.fund_type == fund_type,
+            FundBasicInfo.performance_json.isnot(None)
+        ).all()
+        
+        if len(funds) < 2:
+            continue
+        
+        print(f"[同类排名] 处理 {fund_type}: {len(funds)} 只基金")
+        
+        # 解析业绩数据
+        fund_performances = []
+        for fund in funds:
+            perf = _json_loads(fund.performance_json, {})
+            fund_performances.append({
+                'fund_code': fund.fund_code,
+                'return_1m': perf.get('1_month_return'),
+                'return_3m': perf.get('3_month_return'),
+                'return_6m': perf.get('6_month_return'),
+                'return_1y': perf.get('1_year_return'),
+                'return_2y': perf.get('2_year_return'),
+                'return_3y': perf.get('3_year_return'),
+            })
+        
+        # 为每个时间段计算排名
+        periods = [
+            ('return_1m', 'rank_pct_1m'),
+            ('return_3m', 'rank_pct_3m'),
+            ('return_6m', 'rank_pct_6m'),
+            ('return_1y', 'rank_pct_1y'),
+            ('return_2y', 'rank_pct_2y'),
+            ('return_3y', 'rank_pct_3y'),
+        ]
+        
+        # 为每只基金创建或更新排名记录
+        fund_ranks = {}  # fund_code -> rank data
+        for fp in fund_performances:
+            fund_ranks[fp['fund_code']] = {}
+        
+        for return_field, rank_field in periods:
+            # 获取有该时段收益数据的基金
+            # 重要：排除收益率为 0、"0.00"、None 的基金
+            # 这些通常是成立时间不足导致的缺失数据，而非真实的0%收益
+            def is_valid_return(val):
+                if val is None:
+                    return False
+                try:
+                    num_val = float(val)
+                    # 真实0%收益极其罕见，0值通常表示数据缺失
+                    # 允许一个很小的误差范围（如 -0.01% ~ 0.01%）视为可能的真实数据
+                    if abs(num_val) < 0.01:
+                        return False
+                    return True
+                except (ValueError, TypeError):
+                    return False
+            
+            funds_with_data = [(fp['fund_code'], float(fp[return_field])) for fp in fund_performances 
+                               if is_valid_return(fp[return_field])]
+            
+            if len(funds_with_data) < 2:
+                continue
+            
+            # 按收益率降序排序（收益高排名靠前）
+            funds_with_data.sort(key=lambda x: x[1], reverse=True)
+            total = len(funds_with_data)
+            
+            # 计算每只基金的排名百分位
+            for rank_idx, (fund_code, _) in enumerate(funds_with_data, 1):
+                rank_pct = round((rank_idx / total) * 100, 2)
+                fund_ranks[fund_code][rank_field] = rank_pct
+        
+        # 更新数据库
+        for fund_code, ranks in fund_ranks.items():
+            rank_record = db.query(FundScreeningRank).filter(
+                FundScreeningRank.fund_code == fund_code
+            ).first()
+            
+            if not rank_record:
+                rank_record = FundScreeningRank(fund_code=fund_code)
+                db.add(rank_record)
+            
+            for field, value in ranks.items():
+                setattr(rank_record, field, value)
+            
+            # 计算4433法则
+            pass_4433 = check_4433_rule(
+                ranks.get('rank_pct_1y'),
+                ranks.get('rank_pct_2y'),
+                ranks.get('rank_pct_3y'),
+                None,
+                ranks.get('rank_pct_6m'),
+                ranks.get('rank_pct_3m')
+            )
+            rank_record.pass_4433 = 1 if pass_4433 else 0
+            rank_record.updated_time = datetime.now()
+    
+    db.commit()
+    print("[同类排名] 同类型排名计算完成")
+
+
+# 全局变量：批量更新状态
+screening_update_status = {
+    'running': False,
+    'progress': 0,
+    'total': 0,
+    'current_fund': '',
+    'success_count': 0,
+    'fail_count': 0,
+    'start_time': None,
+    'message': ''
+}
+screening_stop_flag = False
+
+
+def update_single_fund_data(fund_code, db):
+    """
+    更新单只基金的完整数据（简化版）
+    直接获取详情数据，更新所有相关表
+    """
+    try:
+        # 获取完整的基金数据
+        fund_data = fund_api.get_fund_data(fund_code)
+        if not fund_data:
+            return False
+        
+        # 保存到所有相关表
+        _save_fund_data_to_db(db, fund_code, fund_data)
+        
+        # 计算并保存风险指标
+        net_worth_trend = fund_data.get('net_worth_trend', [])
+        if net_worth_trend and len(net_worth_trend) >= 30:
+            risk_metrics = calculate_risk_metrics(net_worth_trend)
+            if risk_metrics:
+                _save_risk_metrics(db, fund_code, risk_metrics)
+        
+        return True
+    except Exception as e:
+        print(f"Error updating data for {fund_code}: {e}")
+        return False
+
+
+def batch_update_fund_data(fund_types=None, limit=None):
+    """
+    批量更新基金数据（简化版）
+    直接获取每只基金的完整详情数据
+    """
+    global screening_update_status, screening_stop_flag
+    
+    if screening_update_status['running']:
+        return {'error': '更新任务正在进行中'}
+    
+    screening_update_status['running'] = True
+    screening_update_status['start_time'] = datetime.now()
+    screening_update_status['message'] = '正在获取基金列表...'
+    screening_stop_flag = False
+    
+    try:
+        # 获取基金列表
+        fund_list = fund_list_cache.fund_list
+        
+        # 按类型筛选
+        if fund_types:
+            fund_list = [f for f in fund_list if any(t in f.get('TYPE', '') for t in fund_types)]
+        
+        # 限制数量
+        if limit:
+            fund_list = fund_list[:limit]
+        
+        screening_update_status['total'] = len(fund_list)
+        screening_update_status['progress'] = 0
+        screening_update_status['success_count'] = 0
+        screening_update_status['fail_count'] = 0
+        
+        db = SessionLocal()
+        
+        for i, fund in enumerate(fund_list):
+            # 检查停止标志
+            if screening_stop_flag:
+                screening_update_status['message'] = f"已手动停止。成功: {screening_update_status['success_count']}, 失败: {screening_update_status['fail_count']}"
+                break
+            
+            fund_code = fund.get('CODE', '')
+            screening_update_status['progress'] = i + 1
+            screening_update_status['current_fund'] = f"{fund_code} - {fund.get('NAME', '')}"
+            screening_update_status['message'] = f"正在处理: {screening_update_status['current_fund']}"
+            
+            if update_single_fund_data(fund_code, db):
+                screening_update_status['success_count'] += 1
+            else:
+                screening_update_status['fail_count'] += 1
+            
+            # 每10只基金提交一次
+            if (i + 1) % 10 == 0:
+                db.commit()
+            
+            # 添加延迟，避免请求过于频繁
+            time.sleep(0.3)
+        
+        db.commit()
+        
+        if not screening_stop_flag:
+            # 计算同类型排名
+            screening_update_status['message'] = '正在计算同类型排名...'
+            calculate_same_type_rankings(db)
+            screening_update_status['message'] = f"更新完成！成功: {screening_update_status['success_count']}, 失败: {screening_update_status['fail_count']}"
+        
+        db.close()
+        
+    except Exception as e:
+        screening_update_status['message'] = f"更新失败: {str(e)}"
+    finally:
+        screening_update_status['running'] = False
+    
+    return {
+        'success': True,
+        'total': screening_update_status['total'],
+        'success_count': screening_update_status['success_count'],
+        'fail_count': screening_update_status['fail_count']
+    }
+
+
+@app.route('/api/screening/status', methods=['GET'])
+def get_screening_status():
+    """获取筛选数据库状态"""
+    db = get_db()
+    
+    # 统计各表数量
+    basic_count = db.query(FundBasicInfo).count()
+    risk_count = db.query(FundRiskMetrics).filter(
+        FundRiskMetrics.sharpe_ratio_1y.isnot(None)
+    ).count()
+    rank_count = db.query(FundScreeningRank).count()
+    pass_4433_count = db.query(FundScreeningRank).filter(
+        FundScreeningRank.pass_4433 == 1
+    ).count()
+    
+    # 获取最新更新时间
+    latest = db.query(FundBasicInfo).order_by(
+        desc(FundBasicInfo.updated_time)
+    ).first()
+    latest_update = latest.updated_time.isoformat() if latest and latest.updated_time else None
+    
+    # 获取各类型数量
+    type_counts = {}
+    types = db.query(FundBasicInfo.fund_type, func.count(FundBasicInfo.fund_code)).group_by(
+        FundBasicInfo.fund_type
+    ).all()
+    for t, c in types:
+        if t:
+            type_counts[t] = c
+    
+    return jsonify({
+        'basic_count': basic_count,
+        'risk_metrics_count': risk_count,
+        'ranking_count': rank_count,
+        'pass_4433_count': pass_4433_count,
+        'latest_update': latest_update,
+        'type_counts': type_counts,
+        'update_status': {
+            'running': screening_update_status['running'],
+            'progress': screening_update_status['progress'],
+            'total': screening_update_status['total'],
+            'current_fund': screening_update_status['current_fund'],
+            'message': screening_update_status['message']
+        }
+    })
+
+
+@app.route('/api/screening/update', methods=['POST'])
+def start_screening_update():
+    """启动基金数据批量更新"""
+    data = request.get_json() or {}
+    fund_types = data.get('fund_types', ['混合型-偏股', '混合型-灵活', '股票型'])
+    limit = data.get('limit')  # 可选：限制更新数量（测试用）
+    
+    if screening_update_status['running']:
+        return jsonify({
+            'error': '更新任务正在进行中',
+            'status': screening_update_status
+        }), 409
+    
+    # 在后台线程执行更新
+    thread = threading.Thread(
+        target=batch_update_fund_data, 
+        args=(fund_types, limit)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        'message': '更新任务已启动',
+        'fund_types': fund_types,
+        'limit': limit
+    })
+
+
+@app.route('/api/screening/stop', methods=['POST'])
+def stop_screening_update():
+    """停止基金数据更新"""
+    global screening_stop_flag
+    screening_stop_flag = True
+    return jsonify({'message': '已发送停止信号'})
+
+
+@app.route('/api/screening/recalculate-rankings', methods=['POST'])
+def recalculate_rankings():
+    """重新计算同类型排名和4433法则标记"""
+    db = get_db()
+    try:
+        calculate_same_type_rankings(db)
+        
+        # 统计结果
+        stats = db.query(
+            FundBasicInfo.fund_type,
+            func.count(FundScreeningRank.fund_code).label('total'),
+            func.sum(FundScreeningRank.pass_4433).label('pass_count')
+        ).join(
+            FundScreeningRank, FundBasicInfo.fund_code == FundScreeningRank.fund_code
+        ).group_by(FundBasicInfo.fund_type).all()
+        
+        type_stats = {}
+        for fund_type, total, pass_count in stats:
+            if fund_type:
+                type_stats[fund_type] = {
+                    'total': total,
+                    'pass_4433': pass_count or 0,
+                    'pass_rate': round((pass_count or 0) / total * 100, 2) if total > 0 else 0
+                }
+        
+        return jsonify({
+            'success': True,
+            'message': '同类型排名计算完成',
+            'stats': type_stats
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/screening/available-types', methods=['POST'])
+def get_available_fund_types():
+    """获取符合当前筛选条件的所有基金类型（用于快速筛选）"""
+    data = request.get_json() or {}
+    strategy = data.get('strategy')
+    filters = data.get('filters', {})
+    
+    db = get_db()
+    
+    # 基础查询
+    query = db.query(FundBasicInfo.fund_type).distinct()
+    
+    # 关联排名表（用于4433筛选）
+    if strategy == '4433':
+        query = query.join(
+            FundScreeningRank, FundBasicInfo.fund_code == FundScreeningRank.fund_code
+        ).filter(FundScreeningRank.pass_4433 == 1)
+    
+    # 关联风险指标表（用于其他策略）
+    if strategy in ['high_sharpe', 'low_volatility', 'anti_fragile']:
+        query = query.join(
+            FundRiskMetrics, FundBasicInfo.fund_code == FundRiskMetrics.fund_code
+        )
+        
+        if strategy == 'high_sharpe':
+            query = query.filter(
+                FundRiskMetrics.sharpe_ratio_1y > 1,
+                FundRiskMetrics.volatility_1y < 25
+            )
+        elif strategy == 'low_volatility':
+            query = query.filter(
+                FundRiskMetrics.volatility_1y < 15,
+                FundRiskMetrics.max_drawdown_1y < 15
+            )
+        elif strategy == 'anti_fragile':
+            query = query.filter(
+                FundRiskMetrics.max_drawdown_1y < 20,
+                FundRiskMetrics.annual_return_1y > 0
+            )
+    
+    # 应用自定义类型筛选
+    if filters.get('fund_types'):
+        type_conditions = []
+        for t in filters['fund_types']:
+            type_conditions.append(FundBasicInfo.fund_type.like(f'%{t}%'))
+        if type_conditions:
+            query = query.filter(or_(*type_conditions))
+    
+    # 获取所有符合条件的类型
+    result = query.filter(FundBasicInfo.fund_type != None).all()
+    types = sorted([r[0] for r in result if r[0]])
+    
+    return jsonify({'types': types})
+
+
+@app.route('/api/screening/query', methods=['POST'])
+def query_screening_funds():
+    """
+    高级基金筛选查询（使用 JOIN 关联查询）
+    数据来源：FundBasicInfo + FundRiskMetrics + FundScreeningRank
+    """
+    data = request.get_json() or {}
+    
+    # 筛选条件
+    filters = data.get('filters', {})
+    
+    # 排序
+    sort_by = data.get('sort_by', 'sharpe_ratio_1y')
+    sort_order = data.get('sort_order', 'desc')
+    
+    # 分页
+    page = data.get('page', 1)
+    page_size = data.get('page_size', 20)
+    
+    # 预设策略
+    strategy = data.get('strategy')
+    
+    db = get_db()
+    
+    # 基础查询：JOIN 三个表
+    query = db.query(
+        FundBasicInfo,
+        FundRiskMetrics,
+        FundScreeningRank
+    ).outerjoin(
+        FundRiskMetrics, FundBasicInfo.fund_code == FundRiskMetrics.fund_code
+    ).outerjoin(
+        FundScreeningRank, FundBasicInfo.fund_code == FundScreeningRank.fund_code
+    )
+    
+    # 应用预设策略
+    if strategy == '4433':
+        query = query.filter(FundScreeningRank.pass_4433 == 1)
+    
+    elif strategy == 'high_sharpe':
+        query = query.filter(
+            FundRiskMetrics.sharpe_ratio_1y > 1,
+            FundRiskMetrics.volatility_1y < 25
+        )
+    
+    elif strategy == 'low_volatility':
+        query = query.filter(
+            FundRiskMetrics.volatility_1y < 15,
+            FundRiskMetrics.max_drawdown_1y < 15
+        )
+    
+    elif strategy == 'anti_fragile':
+        query = query.filter(
+            FundRiskMetrics.max_drawdown_1y < 20,
+            FundRiskMetrics.annual_return_1y > 0
+        )
+    
+    # 应用自定义筛选条件
+    if filters.get('fund_types'):
+        type_conditions = []
+        for t in filters['fund_types']:
+            type_conditions.append(FundBasicInfo.fund_type.like(f'%{t}%'))
+        if type_conditions:
+            query = query.filter(or_(*type_conditions))
+    
+    # 快速类型筛选（精确匹配）
+    if filters.get('quick_fund_type'):
+        query = query.filter(FundBasicInfo.fund_type == filters['quick_fund_type'])
+    
+    # 风险指标筛选
+    if filters.get('sharpe_min') is not None:
+        query = query.filter(FundRiskMetrics.sharpe_ratio_1y >= filters['sharpe_min'])
+    
+    if filters.get('volatility_max') is not None:
+        query = query.filter(FundRiskMetrics.volatility_1y <= filters['volatility_max'])
+    
+    if filters.get('max_drawdown_max') is not None:
+        query = query.filter(FundRiskMetrics.max_drawdown_1y <= filters['max_drawdown_max'])
+    
+    if filters.get('calmar_min') is not None:
+        query = query.filter(FundRiskMetrics.calmar_ratio_1y >= filters['calmar_min'])
+    
+    # 排名筛选
+    if filters.get('rank_1y_max') is not None:
+        query = query.filter(FundScreeningRank.rank_pct_1y <= filters['rank_1y_max'])
+    if filters.get('rank_3m_max') is not None:
+        query = query.filter(FundScreeningRank.rank_pct_3m <= filters['rank_3m_max'])
+    
+    # 排序（根据排序字段选择对应的表）
+    sort_map = {
+        'sharpe_ratio_1y': FundRiskMetrics.sharpe_ratio_1y,
+        'sharpe_ratio_3y': FundRiskMetrics.sharpe_ratio_3y,
+        'volatility_1y': FundRiskMetrics.volatility_1y,
+        'max_drawdown_1y': FundRiskMetrics.max_drawdown_1y,
+        'calmar_ratio_1y': FundRiskMetrics.calmar_ratio_1y,
+        'rank_pct_1y': FundScreeningRank.rank_pct_1y,
+        'rank_pct_3m': FundScreeningRank.rank_pct_3m,
+        'fund_name': FundBasicInfo.fund_name,
+        'updated_time': FundBasicInfo.updated_time,
+    }
+    
+    sort_column = sort_map.get(sort_by, FundRiskMetrics.sharpe_ratio_1y)
+    if sort_order == 'desc':
+        query = query.order_by(desc(sort_column))
+    else:
+        query = query.order_by(asc(sort_column))
+    
+    # 计算总数
+    total_count = query.count()
+    
+    # 分页
+    offset = (page - 1) * page_size
+    results = query.offset(offset).limit(page_size).all()
+    
+    # 构建返回数据
+    fund_list = []
+    
+    # 脏数据自动清理标记（不立即清理，而是返回NULL，防止展示离谱数据）
+    # 如果用户需要修复，可以点击“更新数据”
+    for basic, risk, rank in results:
+        # 解析业绩数据
+        perf = _json_loads(basic.performance_json, {}) if basic else {}
+        
+        # 脏数据检测：如果波动率 > 1000%，视为无效数据
+        is_dirty_risk = risk and risk.volatility_1y and risk.volatility_1y > 1000
+        
+        fund_list.append({
+            'fund_code': basic.fund_code if basic else None,
+            'fund_name': basic.fund_name if basic else None,
+            'fund_type': basic.fund_type if basic else None,
+            # 业绩数据（来自 FundBasicInfo.performance_json）
+            'return_1m': perf.get('1_month_return'),
+            'return_3m': perf.get('3_month_return'),
+            'return_6m': perf.get('6_month_return'),
+            # 如果近1年收益率为 "0.00" 且实际上可能是空数据，则转为 None 或 "--"
+            'return_1y': perf.get('1_year_return') if perf.get('1_year_return') not in ['0.00', 0.0, 0, ''] else None,
+            'return_3y': perf.get('3_year_return') if perf.get('3_year_return') not in ['0.00', 0.0, 0, ''] else None,
+            # 风险指标（来自 FundRiskMetrics），如果脏数据则隐藏
+            'max_drawdown_1y': (risk.max_drawdown_1y if risk else None) if not is_dirty_risk else None,
+            'max_drawdown_3y': (risk.max_drawdown_3y if risk else None) if not is_dirty_risk else None,
+            'volatility_1y': (risk.volatility_1y if risk else None) if not is_dirty_risk else None,
+            'volatility_3y': (risk.volatility_3y if risk else None) if not is_dirty_risk else None,
+            'sharpe_ratio_1y': (risk.sharpe_ratio_1y if risk else None) if not is_dirty_risk else None,
+            'sharpe_ratio_3y': (risk.sharpe_ratio_3y if risk else None) if not is_dirty_risk else None,
+            'calmar_ratio_1y': (risk.calmar_ratio_1y if risk else None) if not is_dirty_risk else None,
+            'calmar_ratio_3y': (risk.calmar_ratio_3y if risk else None) if not is_dirty_risk else None,
+            # 排名数据（来自 FundScreeningRank）
+            'rank_pct_1m': rank.rank_pct_1m if rank else None,
+            'rank_pct_3m': rank.rank_pct_3m if rank else None,
+            'rank_pct_6m': rank.rank_pct_6m if rank else None,
+            'rank_pct_1y': rank.rank_pct_1y if rank else None,
+            'pass_4433': (rank.pass_4433 == 1) if rank else False,
+            # 时间戳
+            'updated_time': basic.updated_time.isoformat() if basic and basic.updated_time else None
+        })
+    
+    return jsonify({
+        'total': total_count,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': math.ceil(total_count / page_size) if total_count > 0 else 0,
+        'data': fund_list
+    })
+
+
+@app.route('/api/screening/strategies', methods=['GET'])
+def get_screening_strategies():
+    """获取预设筛选策略列表"""
+    strategies = [
+        {
+            'id': '4433',
+            'name': '4433法则',
+            'description': '同类型基金中：近1/2/3年排名前25%，近3/6个月排名前33%',
+            'tags': ['经典策略', '同类排名', '业绩稳定']
+        },
+        {
+            'id': 'high_sharpe',
+            'name': '高夏普比率',
+            'description': '夏普比率 > 1，单位风险收益最优',
+            'tags': ['风险调整', '收益优化']
+        },
+        {
+            'id': 'low_volatility',
+            'name': '低波动策略',
+            'description': '波动率 < 15%，最大回撤 < 15%，稳健型',
+            'tags': ['低风险', '稳健']
+        },
+        {
+            'id': 'anti_fragile',
+            'name': '反脆弱策略',
+            'description': '在极端行情中表现稳健的基金',
+            'tags': ['抗跌', '极端行情']
+        },
+        {
+            'id': 'high_calmar',
+            'name': '高卡玛比率',
+            'description': '年化收益/最大回撤比值高，性价比最优',
+            'tags': ['风险调整', '性价比']
+        }
+    ]
+    return jsonify({'strategies': strategies})
+
+
+@app.route('/api/screening/fund/<fund_code>', methods=['GET'])
+def get_screening_fund_detail(fund_code):
+    """获取单只基金的筛选详情数据（JOIN 查询）"""
+    db = get_db()
+    
+    # JOIN 查询
+    result = db.query(
+        FundBasicInfo,
+        FundRiskMetrics,
+        FundScreeningRank,
+        FundExtraData
+    ).outerjoin(
+        FundRiskMetrics, FundBasicInfo.fund_code == FundRiskMetrics.fund_code
+    ).outerjoin(
+        FundScreeningRank, FundBasicInfo.fund_code == FundScreeningRank.fund_code
+    ).outerjoin(
+        FundExtraData, FundBasicInfo.fund_code == FundExtraData.fund_code
+    ).filter(
+        FundBasicInfo.fund_code == fund_code
+    ).first()
+    
+    if not result:
+        return jsonify({'error': 'Fund not found'}), 404
+    
+    basic, risk, rank, extra = result
+    perf = _json_loads(basic.performance_json, {})
+    
+    return jsonify({
+        'fund_code': basic.fund_code,
+        'fund_name': basic.fund_name,
+        'fund_type': basic.fund_type,
+        'returns': {
+            '1m': perf.get('1_month_return'),
+            '3m': perf.get('3_month_return'),
+            '6m': perf.get('6_month_return'),
+            '1y': perf.get('1_year_return'),
+            '2y': perf.get('2_year_return'),
+            '3y': perf.get('3_year_return'),
+        },
+        'risk_metrics': {
+            'max_drawdown_1y': risk.max_drawdown_1y if risk else None,
+            'max_drawdown_3y': risk.max_drawdown_3y if risk else None,
+            'volatility_1y': risk.volatility_1y if risk else None,
+            'volatility_3y': risk.volatility_3y if risk else None,
+            'sharpe_ratio_1y': risk.sharpe_ratio_1y if risk else None,
+            'sharpe_ratio_3y': risk.sharpe_ratio_3y if risk else None,
+            'calmar_ratio_1y': risk.calmar_ratio_1y if risk else None,
+            'calmar_ratio_3y': risk.calmar_ratio_3y if risk else None
+        },
+        'rankings': {
+            '1m': rank.rank_pct_1m if rank else None,
+            '3m': rank.rank_pct_3m if rank else None,
+            '6m': rank.rank_pct_6m if rank else None,
+            '1y': rank.rank_pct_1y if rank else None,
+            '2y': rank.rank_pct_2y if rank else None,
+            '3y': rank.rank_pct_3y if rank else None,
+        },
+        'pass_4433': (rank.pass_4433 == 1) if rank else False,
+        'updated_time': basic.updated_time.isoformat() if basic.updated_time else None
+    })
+
+
+@app.route('/api/screening/update-single/<fund_code>', methods=['POST'])
+def update_single_fund(fund_code):
+    """更新单只基金数据"""
+    db = get_db()
+    
+    success = update_single_fund_data(fund_code, db)
+    db.commit()
+    
+    if success:
+        return jsonify({'message': f'Fund {fund_code} updated successfully'})
+    else:
+        return jsonify({'error': f'Failed to update fund {fund_code}'}), 500
+
+
+@app.route('/api/fund/<fund_code>/data-versions', methods=['GET'])
+def get_fund_data_versions(fund_code):
+    """
+    获取单只基金各数据源的版本时间
+    用于前端检测数据一致性
+    """
+    db = get_db()
+    
+    basic = db.query(FundBasicInfo).filter(FundBasicInfo.fund_code == fund_code).first()
+    trend = db.query(FundTrend).filter(FundTrend.fund_code == fund_code).first()
+    risk = db.query(FundRiskMetrics).filter(FundRiskMetrics.fund_code == fund_code).first()
+    rank = db.query(FundScreeningRank).filter(FundScreeningRank.fund_code == fund_code).first()
+    
+    return jsonify({
+        'fund_code': fund_code,
+        'basic_info': {
+            'exists': basic is not None,
+            'updated_time': basic.updated_time.isoformat() if basic and basic.updated_time else None
+        },
+        'trend': {
+            'exists': trend is not None,
+            'updated_time': trend.updated_time.isoformat() if trend and trend.updated_time else None
+        },
+        'risk_metrics': {
+            'exists': risk is not None,
+            'updated_time': risk.updated_time.isoformat() if risk and risk.updated_time else None,
+            'has_valid_data': risk.sharpe_ratio_1y is not None if risk else False
+        },
+        'screening_rank': {
+            'exists': rank is not None,
+            'updated_time': rank.updated_time.isoformat() if rank and rank.updated_time else None,
+            'pass_4433': (rank.pass_4433 == 1) if rank else None
+        }
+    })
+
+
+@app.route('/api/data/stats', methods=['GET'])
+def get_data_stats():
+    """获取数据库统计信息"""
+    db = get_db()
+    
+    stats = {
+        'fund_basic_info': db.query(FundBasicInfo).count(),
+        'fund_trend': db.query(FundTrend).count(),
+        'fund_risk_metrics': db.query(FundRiskMetrics).filter(
+            FundRiskMetrics.sharpe_ratio_1y.isnot(None)
+        ).count(),
+        'fund_screening_rank': db.query(FundScreeningRank).count(),
+        'fund_watchlist': db.query(FundWatchlist).count(),
+        'pass_4433_count': db.query(FundScreeningRank).filter(
+            FundScreeningRank.pass_4433 == 1
+        ).count(),
+    }
+    
+    # 按类型统计
+    type_stats = db.query(
+        FundBasicInfo.fund_type,
+        func.count(FundBasicInfo.fund_code)
+    ).group_by(FundBasicInfo.fund_type).all()
+    
+    stats['by_type'] = {t: c for t, c in type_stats if t}
+    
+    return jsonify(stats)
 
 
 if __name__ == '__main__':
