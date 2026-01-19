@@ -118,22 +118,60 @@
         </div>
         
         <div class="filter-card">
-          <!-- 基金类型 - 改为标签式选择 -->
+          <!-- 基金类型 - 多级分类选择 -->
           <div class="filter-row type-row">
             <div class="filter-label">
               <span class="label-icon">📁</span>
               <span>基金类型</span>
-            </div>
-            <div class="type-tags">
-              <span 
-                v-for="type in fundTypeOptions" 
-                :key="type.value"
-                class="type-tag"
-                :class="{ active: filters.fund_types.includes(type.value) }"
-                @click="toggleFundType(type.value)"
-              >
-                {{ type.label }}
+              <span class="selected-count" v-if="filters.fund_types.length > 0">
+                (已选 {{ filters.fund_types.length }} 项)
               </span>
+            </div>
+            <div class="type-categories">
+              <div 
+                v-for="category in fundTypeCategories" 
+                :key="category.name"
+                class="type-category"
+              >
+                <!-- 分类标题 -->
+                <div 
+                  class="category-header"
+                  @click="toggleCategory(category.name)"
+                >
+                  <span class="category-toggle">
+                    {{ isCategoryExpanded(category.name) ? '▼' : '▶' }}
+                  </span>
+                  <span class="category-icon">{{ category.icon }}</span>
+                  <span class="category-name">{{ category.name }}</span>
+                  <span 
+                    class="category-checkbox"
+                    :class="{ 
+                      'checked': isCategoryAllSelected(category),
+                      'partial': isCategoryPartialSelected(category)
+                    }"
+                    @click.stop="selectCategory(category)"
+                    title="全选/取消该分类"
+                  >
+                    <template v-if="isCategoryAllSelected(category)">✓</template>
+                    <template v-else-if="isCategoryPartialSelected(category)">-</template>
+                  </span>
+                </div>
+                <!-- 分类下的类型标签 -->
+                <div 
+                  class="category-types" 
+                  v-show="isCategoryExpanded(category.name)"
+                >
+                  <span 
+                    v-for="type in category.types" 
+                    :key="type.value"
+                    class="type-tag"
+                    :class="{ active: filters.fund_types.includes(type.value) }"
+                    @click="toggleFundType(type.value)"
+                  >
+                    {{ type.label }}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -242,10 +280,11 @@
           <h3>筛选结果 <span class="result-count">(共 {{ totalCount }} 只)</span></h3>
         </div>
         
-        <!-- 类型快速筛选 -->
+        <!-- 类型快速筛选 - 多级菜单 -->
         <div class="quick-type-filter">
           <span class="filter-label-inline">类型筛选:</span>
-          <div class="quick-type-tags">
+          <div class="quick-type-menu">
+            <!-- 全部按钮 -->
             <span 
               class="quick-tag"
               :class="{ active: quickTypeFilter === '' }"
@@ -253,8 +292,49 @@
             >
               全部
             </span>
+            
+            <!-- 多级分类下拉 -->
+            <div 
+              v-for="category in quickTypeCategories" 
+              :key="category.name"
+              class="quick-type-dropdown"
+              @click.stop
+            >
+              <span 
+                class="quick-tag dropdown-trigger"
+                :class="{ 
+                  active: isCategoryTypeActive(category),
+                  'has-active': hasCategoryActiveType(category)
+                }"
+                @click="toggleQuickDropdown(category.name)"
+              >
+                {{ category.icon }} {{ category.name }}
+                <span class="dropdown-arrow">▼</span>
+              </span>
+              
+              <!-- 下拉菜单 -->
+              <div 
+                class="dropdown-menu"
+                v-show="activeQuickDropdown === category.name"
+              >
+                <div 
+                  v-for="type in getFilteredCategoryTypes(category)" 
+                  :key="type"
+                  class="dropdown-item"
+                  :class="{ active: quickTypeFilter === type }"
+                  @click="setQuickTypeFilter(type)"
+                >
+                  {{ getShortTypeName(type) }}
+                </div>
+                <div v-if="getFilteredCategoryTypes(category).length === 0" class="dropdown-empty">
+                  暂无此类型基金
+                </div>
+              </div>
+            </div>
+            
+            <!-- 未分类的类型（如果有） -->
             <span 
-              v-for="type in availableTypes" 
+              v-for="type in uncategorizedTypes" 
               :key="type"
               class="quick-tag"
               :class="{ active: quickTypeFilter === type }"
@@ -442,21 +522,105 @@ export default {
       institution_ratio_min: null
     })
     
-    // 基金类型选项（与 fundcode_search.js 中的类型对应）
-    const fundTypeOptions = [
-      { value: '混合型-偏股', label: '偏股混合' },
-      { value: '混合型-灵活', label: '灵活配置' },
-      { value: '混合型-平衡', label: '平衡混合' },
-      { value: '混合型', label: '混合型(全部)' },
-      { value: '股票型', label: '股票型' },
-      { value: '股票指数', label: '股票指数' },
-      { value: '联接基金', label: '联接基金' },
-      { value: '债券型', label: '债券型' },
-      { value: '债券指数', label: '债券指数' },
-      { value: 'QDII', label: 'QDII' },
-      { value: 'FOF', label: 'FOF' },
-      { value: '货币型', label: '货币型' }
+    // 多级基金类型选项
+    const fundTypeCategories = [
+      {
+        name: '偏股型',
+        icon: '📈',
+        expanded: true,
+        types: [
+          { value: '混合型-偏股', label: '偏股混合' },
+          { value: '混合型-灵活', label: '灵活配置' },
+          { value: '混合型-平衡', label: '平衡混合' },
+          { value: '股票型', label: '股票型' },
+          { value: '股票指数', label: '股票指数' },
+          { value: '联接基金', label: '联接基金' }
+        ]
+      },
+      {
+        name: '偏债型',
+        icon: '📊',
+        expanded: false,
+        types: [
+          { value: '混合型-偏债', label: '偏债混合' },
+          { value: '债券型-长债', label: '长期纯债' },
+          { value: '债券型-中短债', label: '中短债' },
+          { value: '债券型', label: '债券型(全部)' },
+          { value: '债券指数', label: '债券指数' }
+        ]
+      },
+      {
+        name: '货币/其他',
+        icon: '💰',
+        expanded: false,
+        types: [
+          { value: '货币型', label: '货币型' },
+          { value: 'FOF', label: 'FOF' },
+          { value: 'QDII', label: 'QDII' },
+          { value: 'QDII-指数', label: 'QDII指数' },
+          { value: 'REITs', label: 'REITs' }
+        ]
+      }
     ]
+    
+    // 控制分类展开状态
+    const expandedCategories = ref(['偏股型'])
+    
+    // 切换分类展开/折叠
+    const toggleCategory = (categoryName) => {
+      const index = expandedCategories.value.indexOf(categoryName)
+      if (index > -1) {
+        expandedCategories.value.splice(index, 1)
+      } else {
+        expandedCategories.value.push(categoryName)
+      }
+    }
+    
+    // 检查分类是否展开
+    const isCategoryExpanded = (categoryName) => {
+      return expandedCategories.value.includes(categoryName)
+    }
+    
+    // 选择整个分类下的所有类型
+    const selectCategory = (category) => {
+      const categoryTypes = category.types.map(t => t.value)
+      const allSelected = categoryTypes.every(t => filters.fund_types.includes(t))
+      
+      if (allSelected) {
+        // 全部取消
+        categoryTypes.forEach(t => {
+          const idx = filters.fund_types.indexOf(t)
+          if (idx > -1) filters.fund_types.splice(idx, 1)
+        })
+      } else {
+        // 全部选中
+        categoryTypes.forEach(t => {
+          if (!filters.fund_types.includes(t)) {
+            filters.fund_types.push(t)
+          }
+        })
+      }
+    }
+    
+    // 检查分类是否全选
+    const isCategoryAllSelected = (category) => {
+      return category.types.every(t => filters.fund_types.includes(t))
+    }
+    
+    // 检查分类是否部分选中
+    const isCategoryPartialSelected = (category) => {
+      const selected = category.types.filter(t => filters.fund_types.includes(t))
+      return selected.length > 0 && selected.length < category.types.length
+    }
+    
+    // 兼容旧的 fundTypeOptions (用于更新弹窗)
+    const fundTypeOptions = computed(() => {
+      const allTypes = []
+      fundTypeCategories.forEach(cat => {
+        cat.types.forEach(t => allTypes.push(t))
+      })
+      return allTypes
+    })
     
     // 排序
     const sortBy = ref('return_1y')
@@ -465,6 +629,81 @@ export default {
     // 快速类型筛选（后端筛选）
     const quickTypeFilter = ref('')
     const availableTypes = ref([])  // 从后端获取可选类型
+    const activeQuickDropdown = ref(null)  // 当前打开的下拉菜单
+    
+    // 快速筛选的多级分类配置
+    const quickTypeCategories = [
+      {
+        name: '偏股型',
+        icon: '📈',
+        patterns: ['混合型-偏股', '混合型-灵活', '混合型-平衡', '股票型', '股票指数', '联接基金', '增强指数', '被动指数']
+      },
+      {
+        name: '偏债型',
+        icon: '📊',
+        patterns: ['混合型-偏债', '债券型', '债券指数', '短债', '中短债', '长债', '纯债', '可转债']
+      },
+      {
+        name: 'FOF',
+        icon: '🎯',
+        patterns: ['FOF']
+      },
+      {
+        name: 'QDII',
+        icon: '🌍',
+        patterns: ['QDII']
+      },
+      {
+        name: '货币/其他',
+        icon: '💰',
+        patterns: ['货币型', 'REITs', '商品']
+      }
+    ]
+    
+    // 切换下拉菜单
+    const toggleQuickDropdown = (categoryName) => {
+      if (activeQuickDropdown.value === categoryName) {
+        activeQuickDropdown.value = null
+      } else {
+        activeQuickDropdown.value = categoryName
+      }
+    }
+    
+    // 打开下拉菜单 (不再使用)
+    const openQuickDropdown = (categoryName) => {
+      // no-op
+    }
+    
+    // 关闭下拉菜单
+    const closeQuickDropdown = () => {
+      activeQuickDropdown.value = null
+    }
+    
+    // 获取分类下在可用类型中的类型
+    const getFilteredCategoryTypes = (category) => {
+      return availableTypes.value.filter(type => {
+        return category.patterns.some(pattern => type.includes(pattern))
+      })
+    }
+    
+    // 检查分类下是否有当前选中的类型
+    const isCategoryTypeActive = (category) => {
+      if (!quickTypeFilter.value) return false
+      return category.patterns.some(pattern => quickTypeFilter.value.includes(pattern))
+    }
+    
+    // 检查分类下是否有可用类型
+    const hasCategoryActiveType = (category) => {
+      return getFilteredCategoryTypes(category).length > 0
+    }
+    
+    // 获取未分类的类型
+    const uncategorizedTypes = computed(() => {
+      const allPatterns = quickTypeCategories.flatMap(c => c.patterns)
+      return availableTypes.value.filter(type => {
+        return !allPatterns.some(pattern => type.includes(pattern))
+      })
+    })
     
     // 分页
     const currentPage = ref(1)
@@ -713,6 +952,7 @@ export default {
     // 快速类型筛选（触发后端重新查询）
     const setQuickTypeFilter = (type) => {
       quickTypeFilter.value = type
+      activeQuickDropdown.value = null // 关闭下拉菜单
       currentPage.value = 1  // 重置到第一页
       search()  // 重新查询后端
     }
@@ -836,10 +1076,14 @@ export default {
       if (updateStatus.value.running) {
         startStatusPoll()
       }
+
+      // 点击外部关闭下拉菜单
+      document.addEventListener('click', closeQuickDropdown)
     })
     
     onUnmounted(() => {
       stopStatusPoll()
+      document.removeEventListener('click', closeQuickDropdown)
     })
     
     return {
@@ -854,6 +1098,8 @@ export default {
       selectedStrategy,
       filters,
       fundTypeOptions,
+      fundTypeCategories,
+      expandedCategories,
       sortBy,
       sortOrder,
       currentPage,
@@ -865,6 +1111,9 @@ export default {
       progressPercent,
       quickTypeFilter,
       availableTypes,
+      activeQuickDropdown,
+      quickTypeCategories,
+      uncategorizedTypes,
       
       // 方法
       fetchDbStatus,
@@ -889,10 +1138,28 @@ export default {
       getStyleClass,
       toggleFundType,
       setQuickTypeFilter,
-      getShortTypeName
+      getShortTypeName,
+      toggleCategory,
+      isCategoryExpanded,
+      selectCategory,
+      isCategoryAllSelected,
+      isCategoryPartialSelected,
+      openQuickDropdown,
+      closeQuickDropdown,
+      toggleQuickDropdown,
+      getFilteredCategoryTypes,
+      isCategoryTypeActive,
+      hasCategoryActiveType
+    }
+      isCategoryPartialSelected,
+      openQuickDropdown,
+      closeQuickDropdown,
+      getFilteredCategoryTypes,
+      isCategoryTypeActive,
+      hasCategoryActiveType
     }
   }
-}
+
 </script>
 
 <style scoped>
@@ -1350,6 +1617,99 @@ export default {
   font-size: 16px;
 }
 
+.selected-count {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: normal;
+  margin-left: 6px;
+}
+
+/* 多级类型分类容器 */
+.type-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.type-category {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  background: white;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.category-header:hover {
+  background: #f3f4f6;
+}
+
+.category-toggle {
+  font-size: 10px;
+  color: #9ca3af;
+  width: 12px;
+}
+
+.category-icon {
+  font-size: 14px;
+}
+
+.category-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.category-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.category-checkbox:hover {
+  border-color: #667eea;
+}
+
+.category-checkbox.checked {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: transparent;
+}
+
+.category-checkbox.partial {
+  background: #a5b4fc;
+  border-color: transparent;
+  color: white;
+}
+
+.category-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  background: white;
+  border-top: 1px solid #f3f4f6;
+}
+
+/* 保留旧的type-tags样式用于更新弹窗 */
 .type-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1494,6 +1854,9 @@ export default {
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 16px;
+  position: relative;
+  z-index: 50;
+  overflow: visible;
 }
 
 .results-title-row {
@@ -1521,13 +1884,22 @@ export default {
   padding: 8px 12px;
   background: #f8fafc;
   border-radius: 10px;
-  overflow-x: auto;
+  overflow: visible;
+  position: relative;
+  z-index: 50;
 }
 
 .filter-label-inline {
   font-size: 13px;
   color: #6b7280;
   white-space: nowrap;
+}
+
+.quick-type-menu {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .quick-type-tags {
@@ -1557,6 +1929,76 @@ export default {
   background: #667eea;
   border-color: #667eea;
   color: white;
+}
+
+.quick-tag.has-active {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+}
+
+/* 下拉菜单容器 */
+.quick-type-dropdown {
+  position: relative;
+  z-index: 100;
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dropdown-arrow {
+  font-size: 8px;
+  margin-left: 2px;
+  transition: transform 0.2s;
+}
+
+.quick-type-dropdown:hover .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 140px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  margin-top: 4px;
+  padding: 4px 0;
+}
+
+.dropdown-item {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.dropdown-item:hover {
+  background: #f3f4f6;
+  color: #4f46e5;
+}
+
+.dropdown-item.active {
+  background: #eef2ff;
+  color: #667eea;
+  font-weight: 500;
+}
+
+.dropdown-empty {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
 }
 
 .sort-options {

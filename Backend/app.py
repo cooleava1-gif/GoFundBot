@@ -14,6 +14,7 @@ import math
 import threading
 import time
 import re
+import requests
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -661,6 +662,88 @@ def move_fund_to_group():
     except Exception as e:
         db.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/watchlist/refresh-estimates', methods=['POST'])
+def refresh_watchlist_estimates():
+    """
+    批量刷新自选基金的实时估值数据
+    此接口专门用于快速获取实时估值，不涉及完整基金数据更新
+    """
+    db = get_db()
+    
+    # 获取所有自选基金代码
+    watchlist = db.query(FundWatchlist).all()
+    if not watchlist:
+        return jsonify({'message': 'Watchlist is empty', 'updated': 0})
+    
+    fund_codes = [item.fund_code for item in watchlist]
+    updated_count = 0
+    results = []
+    
+    for fund_code in fund_codes:
+        try:
+            # 只获取实时估值数据（轻量级请求）
+            real_time_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js"
+            response = requests.get(real_time_url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }, timeout=3)
+            
+            if response.status_code == 200:
+                match = re.search(r"jsonpgz\((.*?)\);", response.text)
+                if match:
+                    rt_data = json.loads(match.group(1))
+                    if rt_data:
+                        # 更新数据库中的估值信息
+                        estimate_record = db.query(FundEstimate).filter(
+                            FundEstimate.fund_code == fund_code
+                        ).first()
+                        
+                        if estimate_record:
+                            estimate_record.name = rt_data.get('name')
+                            estimate_record.net_worth = rt_data.get('dwjz')
+                            estimate_record.net_worth_date = rt_data.get('jzrq')
+                            estimate_record.estimate_value = rt_data.get('gsz')
+                            estimate_record.estimate_change = rt_data.get('gszzl')
+                            estimate_record.estimate_time = rt_data.get('gztime')
+                        else:
+                            estimate_record = FundEstimate(
+                                fund_code=fund_code,
+                                name=rt_data.get('name'),
+                                net_worth=rt_data.get('dwjz'),
+                                net_worth_date=rt_data.get('jzrq'),
+                                estimate_value=rt_data.get('gsz'),
+                                estimate_change=rt_data.get('gszzl'),
+                                estimate_time=rt_data.get('gztime')
+                            )
+                            db.add(estimate_record)
+                        
+                        updated_count += 1
+                        results.append({
+                            'fund_code': fund_code,
+                            'estimate_value': rt_data.get('gsz'),
+                            'estimate_change': rt_data.get('gszzl'),
+                            'estimate_time': rt_data.get('gztime'),
+                            'net_worth': rt_data.get('dwjz'),
+                            'net_worth_date': rt_data.get('jzrq')
+                        })
+        except Exception as e:
+            # 单个基金失败不影响其他
+            print(f"刷新 {fund_code} 估值失败: {e}")
+            continue
+    
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+    
+    return jsonify({
+        'message': f'Updated {updated_count} funds',
+        'updated': updated_count,
+        'total': len(fund_codes),
+        'data': results
+    })
 
 
 # ==================== 风险指标计算 ====================

@@ -30,10 +30,22 @@
             完成
           </button>
         </template>
-        <button class="btn btn-refresh" @click="refreshWatchlist" :disabled="loading" title="刷新">
-          🔄
+        <button 
+          class="btn btn-refresh" 
+          @click="refreshEstimates" 
+          :disabled="isRefreshingEstimates || totalCount === 0" 
+          :title="lastEstimateUpdate ? `估值更新于 ${lastEstimateUpdate}` : '刷新估值'"
+        >
+          <span :class="{ 'rotating': isRefreshingEstimates }">🔄</span>
         </button>
       </div>
+    </div>
+    
+    <!-- 估值更新提示 -->
+    <div v-if="lastEstimateUpdate && totalCount > 0" class="estimate-update-hint">
+      <span class="hint-icon">📊</span>
+      <span>估值更新于 {{ lastEstimateUpdate }}</span>
+      <span class="hint-auto">（自动刷新）</span>
     </div>
 
     <!-- 加载状态 -->
@@ -145,7 +157,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, nextTick, toRef } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, toRef } from 'vue'
 import { watchlistAPI } from '../services/api'
 import FundListItems from './FundListItems.vue'
 
@@ -173,6 +185,12 @@ export default {
     const editingGroup = ref(null)
     const groupName = ref('')
     const groupNameInput = ref(null)
+    
+    // 估值刷新相关
+    const estimateRefreshTimer = ref(null)
+    const lastEstimateUpdate = ref(null)
+    const isRefreshingEstimates = ref(false)
+    const ESTIMATE_REFRESH_INTERVAL = 3 * 60 * 1000  // 3分钟刷新一次估值
 
     // 计算属性
     const totalCount = computed(() => watchlist.value.length)
@@ -213,6 +231,72 @@ export default {
     }
 
     const refreshWatchlist = () => loadWatchlist()
+    
+    // 刷新估值数据（只更新估值，不重新加载整个列表）
+    const refreshEstimates = async () => {
+      if (isRefreshingEstimates.value || watchlist.value.length === 0) return
+      
+      isRefreshingEstimates.value = true
+      try {
+        const response = await watchlistAPI.refreshEstimates()
+        if (response.data && response.data.data) {
+          // 更新本地数据中的估值信息
+          const estimateMap = {}
+          response.data.data.forEach(item => {
+            estimateMap[item.fund_code] = item
+          })
+          
+          watchlist.value.forEach(fund => {
+            const newEstimate = estimateMap[fund.fund_code]
+            if (newEstimate) {
+              fund.estimate_value = newEstimate.estimate_value
+              fund.estimate_change = newEstimate.estimate_change
+              fund.estimate_time = newEstimate.estimate_time
+              fund.net_worth = newEstimate.net_worth
+              fund.net_worth_date = newEstimate.net_worth_date
+            }
+          })
+          
+          lastEstimateUpdate.value = new Date().toLocaleTimeString()
+        }
+      } catch (error) {
+        console.error('刷新估值失败:', error)
+      } finally {
+        isRefreshingEstimates.value = false
+      }
+    }
+    
+    // 启动估值自动刷新定时器
+    const startEstimateRefreshTimer = () => {
+      // 先立即刷新一次
+      refreshEstimates()
+      
+      // 设置定时刷新
+      estimateRefreshTimer.value = setInterval(() => {
+        // 只在交易时间内刷新（9:30-15:00，周一至周五）
+        const now = new Date()
+        const day = now.getDay()
+        const hour = now.getHours()
+        const minute = now.getMinutes()
+        const timeInMinutes = hour * 60 + minute
+        
+        // 周一到周五，9:30-15:00
+        const isTradeDay = day >= 1 && day <= 5
+        const isTradeTime = timeInMinutes >= 9 * 60 + 30 && timeInMinutes <= 15 * 60
+        
+        if (isTradeDay && isTradeTime) {
+          refreshEstimates()
+        }
+      }, ESTIMATE_REFRESH_INTERVAL)
+    }
+    
+    // 停止估值刷新定时器
+    const stopEstimateRefreshTimer = () => {
+      if (estimateRefreshTimer.value) {
+        clearInterval(estimateRefreshTimer.value)
+        estimateRefreshTimer.value = null
+      }
+    }
 
     // 分组展开/折叠
     const toggleGroup = (groupId) => {
@@ -434,6 +518,13 @@ export default {
 
     onMounted(() => {
       loadWatchlist()
+      // 启动估值自动刷新
+      startEstimateRefreshTimer()
+    })
+    
+    onUnmounted(() => {
+      // 组件卸载时停止定时器
+      stopEstimateRefreshTimer()
     })
 
     return {
@@ -452,10 +543,13 @@ export default {
       editingGroup,
       groupName,
       groupNameInput,
+      lastEstimateUpdate,
+      isRefreshingEstimates,
       compareMode: toRef(props, 'compareMode'),
       compareFunds: toRef(props, 'compareFunds'),
       loadWatchlist,
       refreshWatchlist,
+      refreshEstimates,
       toggleGroup,
       enterEditMode,
       exitEditMode,
@@ -551,6 +645,28 @@ export default {
 .btn-refresh:hover:not(:disabled) { background: #d1fae5; }
 .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
 .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+
+/* 旋转动画 */
+.rotating {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+/* 估值更新提示 */
+.estimate-update-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #f0fdf4;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: #16a34a;
+}
+
+.hint-icon { font-size: 12px; }
+.hint-auto { color: #9ca3af; }
 
 /* 状态 */
 .loading-state, .empty-state {

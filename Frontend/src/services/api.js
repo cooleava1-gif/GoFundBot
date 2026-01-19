@@ -124,6 +124,11 @@ export const watchlistAPI = {
     return api.put('/watchlist/groups/reorder', {
       order: groupIdOrder
     })
+  },
+  
+  // 刷新自选基金估值（实时估值更新）
+  refreshEstimates() {
+    return api.post('/watchlist/refresh-estimates')
   }
 }
 
