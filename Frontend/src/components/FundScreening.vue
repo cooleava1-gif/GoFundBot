@@ -636,12 +636,12 @@ export default {
       {
         name: '偏股型',
         icon: '📈',
-        patterns: ['混合型-偏股', '混合型-灵活', '混合型-平衡', '股票型', '股票指数', '联接基金', '增强指数', '被动指数']
+        patterns: ['混合型-偏股', '混合型-灵活', '混合型-平衡', '股票型', '股票指数', '指数型-股票', '联接基金', '增强指数', '被动指数', '指数-股票']
       },
       {
         name: '偏债型',
         icon: '📊',
-        patterns: ['混合型-偏债', '债券型', '债券指数', '短债', '中短债', '长债', '纯债', '可转债']
+        patterns: ['混合型-偏债', '债券型', '债券指数', '指数型-固收', '短债', '中短债', '长债', '纯债', '可转债', '指数-债券']
       },
       {
         name: 'FOF',
@@ -651,15 +651,25 @@ export default {
       {
         name: 'QDII',
         icon: '🌍',
-        patterns: ['QDII']
+        patterns: ['QDII', '海外指数', '指数型-海外']
       },
       {
         name: '货币/其他',
         icon: '💰',
-        patterns: ['货币型', 'REITs', '商品']
+        patterns: ['货币', 'REITs', '商品', '指数-其他', '指数型-其他', '其他']
       }
     ]
     
+    // 辅助函数：确定类型的归属分类（按顺序优先匹配，避免重复）
+    const getTypeCategoryName = (type) => {
+      for (const cat of quickTypeCategories) {
+        if (cat.patterns.some(p => type.includes(p))) {
+          return cat.name
+        }
+      }
+      return null
+    }
+
     // 切换下拉菜单
     const toggleQuickDropdown = (categoryName) => {
       if (activeQuickDropdown.value === categoryName) {
@@ -681,15 +691,14 @@ export default {
     
     // 获取分类下在可用类型中的类型
     const getFilteredCategoryTypes = (category) => {
-      return availableTypes.value.filter(type => {
-        return category.patterns.some(pattern => type.includes(pattern))
-      })
+      return availableTypes.value.filter(type => getTypeCategoryName(type) === category.name)
     }
     
     // 检查分类下是否有当前选中的类型
     const isCategoryTypeActive = (category) => {
       if (!quickTypeFilter.value) return false
-      return category.patterns.some(pattern => quickTypeFilter.value.includes(pattern))
+      // 如果当前选中的类型属于该分类
+      return getTypeCategoryName(quickTypeFilter.value) === category.name
     }
     
     // 检查分类下是否有可用类型
@@ -699,10 +708,7 @@ export default {
     
     // 获取未分类的类型
     const uncategorizedTypes = computed(() => {
-      const allPatterns = quickTypeCategories.flatMap(c => c.patterns)
-      return availableTypes.value.filter(type => {
-        return !allPatterns.some(pattern => type.includes(pattern))
-      })
+      return availableTypes.value.filter(type => getTypeCategoryName(type) === null)
     })
     
     // 分页
@@ -1928,7 +1934,7 @@ export default {
 .quick-tag.active {
   background: #667eea;
   border-color: #667eea;
-  color: white;
+  color: rgb(50, 53, 218);
 }
 
 .quick-tag.has-active {

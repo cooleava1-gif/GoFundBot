@@ -641,14 +641,15 @@ export default {
 .btn-danger:hover:not(:disabled) { background: #fee2e2; }
 .btn-secondary { background: #f3f4f6; color: #374151; }
 .btn-secondary:hover { background: #e5e7eb; }
-.btn-refresh { background: #ecfdf5; color: #10b981; padding: 5px 8px; }
+.btn-refresh { background: #ecfdf5; color: #10b981; padding: 5px 8px; display: inline-flex; align-items: center; justify-content: center; }
 .btn-refresh:hover:not(:disabled) { background: #d1fae5; }
 .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
 .btn-primary:hover:not(:disabled) { opacity: 0.9; }
 
 /* 旋转动画 */
 .rotating {
-  display: inline-block;
+  display: block;
+  transform-origin: center;
   animation: spin 1s linear infinite;
 }
 

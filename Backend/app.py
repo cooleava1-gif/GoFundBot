@@ -1605,7 +1605,7 @@ def get_available_fund_types():
         
         if strategy == 'high_sharpe':
             query = query.filter(
-                FundRiskMetrics.sharpe_ratio_1y > 1,
+                FundRiskMetrics.sharpe_ratio_1y > 2,
                 FundRiskMetrics.volatility_1y < 25
             )
         elif strategy == 'low_volatility':
@@ -1675,7 +1675,7 @@ def query_screening_funds():
     
     elif strategy == 'high_sharpe':
         query = query.filter(
-            FundRiskMetrics.sharpe_ratio_1y > 1,
+            FundRiskMetrics.sharpe_ratio_1y > 2,
             FundRiskMetrics.volatility_1y < 25
         )
     
@@ -1812,7 +1812,7 @@ def get_screening_strategies():
         {
             'id': 'high_sharpe',
             'name': '高夏普比率',
-            'description': '夏普比率 > 1，单位风险收益最优',
+            'description': '夏普比率 > 2，单位风险收益最优',
             'tags': ['风险调整', '收益优化']
         },
         {
