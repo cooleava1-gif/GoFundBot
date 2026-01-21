@@ -37,9 +37,31 @@
               <span>每周定投</span>
             </label>
             <label class="radio-label">
+              <input type="radio" v-model="params.investmentType" value="daily" />
+              <span>每日定投</span>
+            </label>
+            <label class="radio-label">
               <input type="radio" v-model="params.investmentType" value="lump_sum" />
               <span>一次性买入</span>
             </label>
+          </div>
+          
+          <!-- 定投具体日期选择 -->
+          <div v-if="params.investmentType === 'monthly'" class="sub-param">
+            <label>定投日：</label>
+            <select v-model="params.investmentDay">
+              <option v-for="d in 28" :key="d" :value="d">每月{{ d }}号</option>
+            </select>
+          </div>
+          <div v-if="params.investmentType === 'weekly'" class="sub-param">
+            <label>定投日：</label>
+            <select v-model="params.investmentDay">
+              <option :value="0">周一</option>
+              <option :value="1">周二</option>
+              <option :value="2">周三</option>
+              <option :value="3">周四</option>
+              <option :value="4">周五</option>
+            </select>
           </div>
         </div>
       </div>
@@ -47,74 +69,115 @@
       <div class="param-row">
         <div class="param-item">
           <label>{{ params.investmentType === 'lump_sum' ? '投资金额' : '每期金额' }}</label>
-          <input 
-            type="number" 
-            v-model.number="params.amount" 
-            min="0" 
-            step="100"
-            placeholder="1000"
-          />
-          <span class="unit">元</span>
+          <div class="input-with-unit">
+            <input 
+              type="number" 
+              v-model.number="params.amount" 
+              min="0" 
+              step="100"
+              placeholder="1000"
+            />
+            <span class="unit">元</span>
+          </div>
         </div>
 
         <div class="param-item">
           <label>初始资金</label>
-          <input 
-            type="number" 
-            v-model.number="params.initialAmount" 
-            min="0" 
-            step="1000"
-            placeholder="0"
-          />
-          <span class="unit">元</span>
+          <div class="input-with-unit">
+            <input 
+              type="number" 
+              v-model.number="params.initialAmount" 
+              min="0" 
+              step="1000"
+              placeholder="0"
+            />
+            <span class="unit">元</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="param-row">
+        <div class="param-item">
+          <label>分红方式</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" v-model="params.dividendMode" value="reinvest" />
+              <span>红利再投资</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" v-model="params.dividendMode" value="cash" />
+              <span>现金分红</span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="param-item">
+          <label>止盈后资金处理</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" v-model="params.takeProfitAction" value="cash" />
+              <span>落袋为安 (现金)</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" v-model="params.takeProfitAction" value="monetary" />
+              <span>货币理财 (年化2%)</span>
+            </label>
+          </div>
         </div>
       </div>
 
       <div class="param-row">
         <div class="param-item">
           <label>止盈率</label>
-          <input 
-            type="number" 
-            v-model.number="params.takeProfitRate" 
-            min="0" 
-            step="1"
-            placeholder="可选"
-          />
-          <span class="unit">%</span>
+          <div class="input-with-unit">
+            <input 
+              type="number" 
+              v-model.number="params.takeProfitRate" 
+              min="0" 
+              step="1"
+              placeholder="可选"
+            />
+            <span class="unit">%</span>
+          </div>
         </div>
 
         <div class="param-item">
           <label>止损率</label>
-          <input 
-            type="number" 
-            v-model.number="params.stopLossRate" 
-            min="0" 
-            step="1"
-            placeholder="可选"
-          />
-          <span class="unit">%</span>
+          <div class="input-with-unit">
+            <input 
+              type="number" 
+              v-model.number="params.stopLossRate" 
+              min="0" 
+              step="1"
+              placeholder="可选"
+            />
+            <span class="unit">%</span>
+          </div>
         </div>
       </div>
 
       <div class="param-row">
         <div class="param-item">
           <label>手续费率</label>
-          <input 
-            type="number" 
-            v-model.number="params.feeRate" 
-            min="0" 
-            max="2" 
-            step="0.01"
-            placeholder="0.15"
-          />
-          <span class="unit">%</span>
+          <div class="input-with-unit">
+            <input 
+              type="number" 
+              v-model.number="params.feeRate" 
+              min="0" 
+              max="2" 
+              step="0.01"
+              placeholder="0.15"
+            />
+            <span class="unit">%</span>
+          </div>
         </div>
       </div>
 
       <div class="param-row">
         <div class="param-item">
           <label>开始日期</label>
-          <input type="date" v-model="params.startDate" :max="params.endDate" />
+          <input type="date" v-model="params.startDate" :min="minStartDate" :max="params.endDate" />
+          <div v-if="minStartDate" class="date-hint">成立日: {{ minStartDate }}</div>
         </div>
 
         <div class="param-item">
@@ -266,7 +329,7 @@
 <script>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
-import { backtestAPI } from '../services/api'
+import { backtestAPI, fundAPI } from '../services/api'
 import FundSearch from './FundSearch.vue'
 
 export default {
@@ -289,20 +352,47 @@ export default {
     // 基金相关状态
     const currentFundCode = ref(props.fundCode || '')
     const currentFundName = ref('')
+    const minStartDate = ref('') // 基金成立日期（最早回测日期）
     
     watch(() => props.fundCode, (val) => {
       if (val) {
         currentFundCode.value = val
+        fetchFundInfo(val)
       }
     })
 
+    const fetchFundInfo = async (code) => {
+      try {
+        const response = await fundAPI.getFundTrend(code)
+        if (response.data && response.data.net_worth_trend && response.data.net_worth_trend.length > 0) {
+          // 获取最早的净值日期作为成立日期
+          const trends = response.data.net_worth_trend
+          // trends通常是按时间排序的，但为了保险起见，我们取第一个
+          // 注意：API返回的数据通常是升序的（旧->新）
+          const firstDate = trends[0].date // 假设格式为 "YYYY-MM-DD"
+          minStartDate.value = firstDate.split(' ')[0] // 确保只有日期部分
+          
+          // 如果当前设置的开始日期早于成立日期，自动调整
+          if (params.value.startDate < minStartDate.value) {
+            params.value.startDate = minStartDate.value
+          }
+        }
+      } catch (err) {
+        console.error('获取基金信息失败:', err)
+        // 如果获取失败，不强制限制最小日期，或者设为默认值
+      }
+    }
+
     const handleFundSelected = (fund) => {
       // FundSearch 返回的是 { CODE: '...', NAME: '...', ... } 或标准格式
-      currentFundCode.value = fund.CODE || fund.fund_code || fund.code
+      const code = fund.CODE || fund.fund_code || fund.code
+      currentFundCode.value = code
       currentFundName.value = fund.NAME || fund.fund_name || fund.name
       // 重置结果
       result.value = null
       error.value = ''
+      // 获取基金详细信息以确定成立日期
+      fetchFundInfo(code)
     }
 
     const changeFund = () => {
@@ -325,13 +415,27 @@ export default {
     // 默认参数：最近3年，每月定投1000元
     const params = ref({
       investmentType: 'monthly',
+      investmentDay: 1, // 默认每月1号 / 周一
       amount: 1000,
       initialAmount: 0,
       feeRate: 0.15,
       takeProfitRate: null,
       stopLossRate: null,
       startDate: new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      endDate: today
+      endDate: today,
+      dividendMode: 'reinvest', // 默认红利再投资
+      takeProfitAction: 'cash' // 默认落袋为安
+    })
+
+    // 监听投资方式变化，重置日期
+    watch(() => params.value.investmentType, (newType) => {
+      if (newType === 'monthly') {
+        params.value.investmentDay = 1
+      } else if (newType === 'weekly') {
+        params.value.investmentDay = 0 // 周一
+      } else {
+        params.value.investmentDay = null
+      }
     })
 
     // 分页数据
@@ -375,11 +479,14 @@ export default {
           start_date: params.value.startDate,
           end_date: params.value.endDate,
           investment_type: params.value.investmentType,
+          investment_day: params.value.investmentDay,
           amount: params.value.amount,
           initial_amount: params.value.initialAmount,
           fee_rate: params.value.feeRate,
           take_profit_rate: params.value.takeProfitRate,
-          stop_loss_rate: params.value.stopLossRate
+          stop_loss_rate: params.value.stopLossRate,
+          dividend_mode: params.value.dividendMode,
+          take_profit_action: params.value.takeProfitAction
         })
 
         // 后端成功时直接返回 { summary, timeline }，不包含 code 字段
@@ -404,13 +511,16 @@ export default {
     const resetParams = () => {
       params.value = {
         investmentType: 'monthly',
+        investmentDay: 1,
         amount: 1000,
         initialAmount: 0,
         feeRate: 0.15,
         takeProfitRate: null,
         stopLossRate: null,
         startDate: new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        endDate: today
+        endDate: today,
+        dividendMode: 'reinvest',
+        takeProfitAction: 'cash'
       }
       result.value = null
       error.value = ''
@@ -494,12 +604,12 @@ export default {
             type: 'line',
             data: timeline.map(item => item.return_rate),
             smooth: true,
-            lineStyle: { color: '#67C23A', width: 2 },
-            itemStyle: { color: '#67C23A' },
+            lineStyle: { color: '#F56C6C', width: 2 },
+            itemStyle: { color: '#F56C6C' },
             areaStyle: {
               color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(103, 194, 58, 0.3)' },
-                { offset: 1, color: 'rgba(103, 194, 58, 0.05)' }
+                { offset: 0, color: 'rgba(245, 108, 108, 0.3)' },
+                { offset: 1, color: 'rgba(245, 108, 108, 0.05)' }
               ])
             },
             markLine: {
@@ -574,7 +684,7 @@ export default {
         ]
       }
 
-      chartInstance.setOption(option)
+      chartInstance.setOption(option, true)
     }
 
     // 监听图表类型变化
@@ -638,6 +748,13 @@ export default {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.date-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 
 .backtest-header {
@@ -655,6 +772,69 @@ export default {
   margin: 0;
   color: #909399;
   font-size: 14px;
+}
+
+/* 基金选择区域 */
+.fund-select-section {
+  margin-bottom: 20px;
+}
+
+.search-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px 0;
+}
+
+.select-hint {
+  color: #606266;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.selected-fund-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #ecf5ff;
+  border: 1px solid #d9ecff;
+  border-radius: 8px;
+}
+
+.fund-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+
+.fund-info .label {
+  color: #606266;
+}
+
+.fund-info .code {
+  font-weight: bold;
+  color: #409eff;
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.fund-info .name {
+  color: #303133;
+}
+
+.btn-change {
+  padding: 6px 16px;
+  border: 1px solid #409eff;
+  color: #409eff;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-change:hover {
+  background: #409eff;
+  color: #fff;
 }
 
 /* 参数设置 */
@@ -679,6 +859,7 @@ export default {
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .param-item label {
@@ -688,13 +869,24 @@ export default {
   font-weight: 500;
 }
 
+.input-with-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .param-item input[type="number"],
 .param-item input[type="date"] {
+  flex: 1;
   padding: 8px 12px;
+  padding-right: 40px; /* 为右侧单位文字预留空间 */
   border: 1px solid #dcdfe6;
   border-radius: 4px;
   font-size: 14px;
   transition: border-color 0.3s;
+  font-family: inherit;
+  box-sizing: border-box;
+  height: 40px; /* 固定高度确保对齐 */
 }
 
 .param-item input:focus {
@@ -710,15 +902,34 @@ export default {
   color: #909399;
   font-size: 14px;
   pointer-events: none;
-}
-
-.param-item {
-  position: relative;
+  background: white;
+  padding: 0 4px;
+  height: 20px;
+  line-height: 20px;
 }
 
 .radio-group {
   display: flex;
   gap: 15px;
+  margin-top: 4px;
+  flex-wrap: wrap; /* 允许换行以适应更多选项 */
+}
+
+.sub-param {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.sub-param select {
+  padding: 4px 8px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
 }
 
 .radio-label {
@@ -748,6 +959,8 @@ export default {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s;
+  font-family: inherit;
+  min-width: 100px;
 }
 
 .btn:disabled {
@@ -795,6 +1008,7 @@ export default {
 .chart-section,
 .detail-section {
   margin-bottom: 30px;
+  padding: 0 5px;
 }
 
 .summary-section h4,
@@ -803,6 +1017,7 @@ export default {
   margin: 0 0 15px 0;
   font-size: 18px;
   color: #303133;
+  padding-left: 5px;
 }
 
 /* 汇总指标卡片 */
@@ -818,75 +1033,15 @@ export default {
   border-radius: 8px;
   text-align: center;
   transition: transform 0.3s, box-shadow 0.3s;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .summary-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* ... existing styles ... */
-
-/* 基金选择区域 */
-.fund-select-section {
-  margin-bottom: 20px;
-}
-
-.search-container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 20px 0;
-}
-
-.select-hint {
-  color: #606266;
-  margin-bottom: 15px;
-  text-align: center;
-}
-
-.selected-fund-display {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background: #ecf5ff;
-  border: 1px solid #d9ecff;
-  border-radius: 8px;
-}
-
-.fund-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 16px;
-}
-
-.fund-info .label {
-  color: #606266;
-}
-
-.fund-info .code {
-  font-weight: bold;
-  color: #409eff;
-}
-
-.fund-info .name {
-  color: #303133;
-}
-
-.btn-change {
-  padding: 6px 16px;
-  border: 1px solid #409eff;
-  color: #409eff;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-change:hover {
-  background: #409eff;
-  color: #fff;
 }
 
 .summary-card.highlight {
@@ -908,16 +1063,19 @@ export default {
   font-size: 13px;
   color: #909399;
   margin-bottom: 8px;
+  line-height: 1.2;
 }
 
 .summary-card.highlight .card-label {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .card-value {
   font-size: 20px;
   font-weight: bold;
   color: #303133;
+  line-height: 1.2;
+  word-break: break-all;
 }
 
 .summary-card.highlight .card-value {
@@ -925,11 +1083,11 @@ export default {
 }
 
 .card-value.positive {
-  color: #67c23a;
+  color: #f56c6c;
 }
 
 .card-value.negative {
-  color: #f56c6c;
+  color: #67c23a;
 }
 
 /* 图表 */
@@ -937,6 +1095,7 @@ export default {
   display: flex;
   gap: 10px;
   margin-bottom: 15px;
+  padding-left: 5px;
 }
 
 .tab-item {
@@ -947,15 +1106,18 @@ export default {
   font-size: 14px;
   color: #606266;
   transition: all 0.3s;
+  border: 1px solid transparent;
 }
 
 .tab-item:hover {
   background: #e4e7ed;
+  border-color: #dcdfe6;
 }
 
 .tab-item.active {
   background: #409eff;
   color: #fff;
+  border-color: #409eff;
 }
 
 .chart-container {
@@ -972,14 +1134,16 @@ export default {
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  padding: 10px;
+  padding: 12px 15px;
   background: #f5f7fa;
   border-radius: 4px;
   transition: background 0.3s;
+  border: 1px solid transparent;
 }
 
 .detail-header:hover {
   background: #e4e7ed;
+  border-color: #dcdfe6;
 }
 
 .toggle-icon {
@@ -990,25 +1154,30 @@ export default {
 .detail-table-wrapper {
   margin-top: 15px;
   overflow-x: auto;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
 }
 
 .detail-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  min-width: 800px;
 }
 
 .detail-table th,
 .detail-table td {
-  padding: 12px;
+  padding: 12px 15px;
   text-align: left;
   border-bottom: 1px solid #ebeef5;
+  line-height: 1.4;
 }
 
 .detail-table th {
   background: #f5f7fa;
   color: #606266;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .detail-table tbody tr:hover {
@@ -1019,6 +1188,10 @@ export default {
   background: #ecf5ff;
 }
 
+.detail-table tbody tr.sold-day {
+  background: #fff5f5;
+}
+
 .invest-badge {
   display: inline-block;
   padding: 2px 6px;
@@ -1027,14 +1200,28 @@ export default {
   font-size: 12px;
   border-radius: 3px;
   margin-left: 8px;
+  line-height: 1;
+}
+
+.sold-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #f56c6c;
+  color: #fff;
+  font-size: 12px;
+  border-radius: 3px;
+  margin-left: 8px;
+  line-height: 1;
 }
 
 .detail-table .positive {
-  color: #67c23a;
+  color: #f56c6c;
+  font-weight: 500;
 }
 
 .detail-table .negative {
-  color: #f56c6c;
+  color: #67c23a;
+  font-weight: 500;
 }
 
 /* 分页 */
@@ -1044,6 +1231,9 @@ export default {
   align-items: center;
   gap: 15px;
   margin-top: 20px;
+  padding: 15px;
+  background: #f5f7fa;
+  border-top: 1px solid #ebeef5;
 }
 
 .pagination button {
@@ -1054,11 +1244,13 @@ export default {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.3s;
+  min-width: 80px;
 }
 
 .pagination button:hover:not(:disabled) {
   color: #409eff;
   border-color: #409eff;
+  background: #ecf5ff;
 }
 
 .pagination button:disabled {
@@ -1069,12 +1261,19 @@ export default {
 .pagination span {
   font-size: 14px;
   color: #606266;
+  min-width: 100px;
+  text-align: center;
 }
 
 /* 响应式 */
 @media (max-width: 768px) {
   .param-row {
     flex-direction: column;
+    gap: 15px;
+  }
+  
+  .param-item {
+    width: 100%;
   }
   
   .summary-grid {
@@ -1083,6 +1282,34 @@ export default {
   
   .chart-container {
     height: 300px;
+  }
+  
+  .param-actions {
+    flex-direction: column;
+  }
+  
+  .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .fund-backtest {
+    padding: 15px;
+  }
+  
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .selected-fund-display {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  
+  .btn-change {
+    align-self: flex-end;
   }
 }
 </style>
