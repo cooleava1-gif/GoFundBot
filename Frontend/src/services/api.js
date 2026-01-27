@@ -6,7 +6,7 @@ const API_BASE_URL = '/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000
+  timeout: 600000
 })
 
 export const fundAPI = {
@@ -44,6 +44,17 @@ export const fundAPI = {
   getFundCompareData(fundCode, forceRefresh = false) {
     const params = forceRefresh ? '?refresh=true' : ''
     return api.get(`/fund/${fundCode}/compare-data${params}`)
+  },
+  
+  // 获取每日市场行情
+  getDailyMarket(forceRefresh = false) {
+    const params = forceRefresh ? '?refresh=true' : ''
+    return api.get(`/market/daily${params}`)
+  },
+  
+  // AI分析基金
+  analyzeFund(fundCode) {
+    return api.get(`/fund/${fundCode}/analyze`)
   }
 }
 

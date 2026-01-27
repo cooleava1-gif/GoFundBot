@@ -29,6 +29,21 @@ def migrate_db():
                 print("Migration: Added group_id column to fund_watchlist table")
         except Exception as e:
             print(f"Migration check for fund_watchlist: {e}")
+        
+        # 检查并添加 daily_market_summary 表的新列
+        try:
+            result = conn.execute(text("PRAGMA table_info(daily_market_summary)"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'current_step' not in columns:
+                conn.execute(text("ALTER TABLE daily_market_summary ADD COLUMN current_step INTEGER DEFAULT 0"))
+                conn.commit()
+                print("Migration: Added current_step column to daily_market_summary table")
+            if 'step_message' not in columns:
+                conn.execute(text("ALTER TABLE daily_market_summary ADD COLUMN step_message VARCHAR(200)"))
+                conn.commit()
+                print("Migration: Added step_message column to daily_market_summary table")
+        except Exception as e:
+            print(f"Migration check for daily_market_summary: {e}")
 
 def init_db():
     # 确保 Data 目录存在

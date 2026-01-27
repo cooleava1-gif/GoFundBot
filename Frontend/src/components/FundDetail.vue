@@ -8,6 +8,9 @@
       
       <!-- 左侧主区域 -->
       <div class="main-area">
+        <!-- AI 分析 -->
+        <FundAIAnalysis :fundCode="currentFundCode" />
+
         <!-- 净值走势图 -->
         <div class="card card-chart">
           <FundChart
@@ -161,6 +164,7 @@ import FundPortfolio from './FundPortfolio.vue'
 import FundAbilityEval from './FundAbilityEval.vue'
 import FundSubscription from './FundSubscription.vue'
 import FundSameType from './FundSameType.vue'
+import FundAIAnalysis from './FundAIAnalysis.vue'
 import { fundAPI } from '../services/api'
 
 export default {
@@ -176,7 +180,8 @@ export default {
     FundPortfolio,
     FundAbilityEval,
     FundSubscription,
-    FundSameType
+    FundSameType,
+    FundAIAnalysis
   },
   props: {
     fundCode: {

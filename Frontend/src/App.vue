@@ -86,11 +86,7 @@
             <FundSearch @fund-selected="handleFundSelected" />
             <FundDetail v-if="selectedFundCode" :fundCode="selectedFundCode" />
             <div v-else class="welcome-container">
-              <div class="welcome-header">
-                <div class="welcome-icon">📊</div>
-                <h2>GoFundBot 基金分析助手</h2>
-                <p>您的专业基金投资顾问</p>
-              </div>
+              <DailyMarketSummary />
 
               <div class="user-guide">
                 <h3>📝 快速入门</h3>
@@ -153,6 +149,7 @@ import FundWatchlist from './components/FundWatchlist.vue'
 import FundComparison from './components/FundComparison.vue'
 import FundScreening from './components/FundScreening.vue'
 import FundBacktest from './components/FundBacktest.vue'
+import DailyMarketSummary from './components/DailyMarketSummary.vue'
 
 export default {
   name: 'App',
@@ -162,7 +159,8 @@ export default {
     FundWatchlist,
     FundComparison,
     FundScreening,
-    FundBacktest
+    FundBacktest,
+    DailyMarketSummary
   },
   setup() {
     const selectedFundCode = ref('')

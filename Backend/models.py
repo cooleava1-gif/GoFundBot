@@ -220,3 +220,26 @@ class FundWatchlist(Base):
     sort_order = Column(Integer, default=0)
     created_time = Column(DateTime, default=datetime.now)
     updated_time = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class DailyMarketSummary(Base):
+    """
+    每日市场行情摘要缓存表
+    用于存储AI生成的市场分析报告，避免重复调用LLM
+    """
+    __tablename__ = 'daily_market_summary'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(String(10), unique=True, nullable=False, index=True)  # 日期: YYYY-MM-DD
+    status = Column(String(20), default='pending')  # pending / step_1_search / step_2_llm / completed / error
+    current_step = Column(Integer, default=0)       # 当前步骤: 0-未开始, 1-搜索新闻, 2-AI分析, 3-完成
+    step_message = Column(String(200))              # 当前步骤描述
+    market_sentiment = Column(String(50))           # 市场情绪
+    summary = Column(Text)                          # 市场总结
+    indices_json = Column(Text)                     # 指数数据 JSON
+    hot_sectors_json = Column(Text)                 # 热门板块 JSON
+    key_news_json = Column(Text)                    # 关键新闻 JSON
+    outlook = Column(Text)                          # 后市展望
+    error_message = Column(Text)                    # 错误信息（如有）
+    created_time = Column(DateTime, default=datetime.now)
+    updated_time = Column(DateTime, default=datetime.now, onupdate=datetime.now)

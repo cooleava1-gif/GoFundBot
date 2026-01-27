@@ -6,6 +6,7 @@ from models import (FundBasicInfo, FundTrend, FundEstimate, FundPortfolio,
                     FundRiskMetrics, FundScreeningRank)
 from fund_api import FundAPI
 from fund_list_cache import get_fund_list_cache
+from llm_service import get_llm_service
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, and_, or_, func
 from datetime import datetime, timedelta
@@ -308,6 +309,65 @@ def get_fund_detail(fund_code):
         return jsonify(cached_data)
 
     return jsonify({"error": "Fund not found"}), 404
+
+@app.route('/api/market/daily', methods=['GET'])
+def get_daily_market():
+    """
+    获取每日市场行情摘要
+    
+    优化后的接口特性：
+    1. 使用数据库持久化缓存，避免服务重启丢失
+    2. 支持后台异步生成，不阻塞请求
+    3. 返回 loading 状态时，前端可轮询等待
+    4. 支持 ?refresh=true 强制刷新
+    
+    Returns:
+        - 成功: {market_sentiment, summary, indices, ...}
+        - 加载中: {loading: true, message: "..."}
+        - 错误: {error: "..."}
+    """
+    force_refresh = request.args.get('refresh', 'false').lower() == 'true'
+    
+    try:
+        llm_service = get_llm_service()
+        if not llm_service.is_available():
+            return jsonify({"error": "AI service not configured"}), 503
+            
+        result = llm_service.generate_market_summary(force_refresh=force_refresh)
+        
+        # 如果是 loading 状态，返回 202 Accepted
+        if result.get('loading'):
+            return jsonify(result), 202
+            
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/fund/<fund_code>/analyze', methods=['GET'])
+def analyze_fund(fund_code):
+    """
+    使用 AI 分析基金，结合实时市场新闻
+    """
+    if not fund_code:
+        return jsonify({"error": "Fund code is required"}), 400
+    
+    # 1. 获取基金数据
+    fund_data = fund_api.get_fund_data(fund_code)
+    if not fund_data:
+        return jsonify({"error": "Fund data not found"}), 404
+        
+    # 2. 调用 LLM 服务进行分析
+    try:
+        llm_service = get_llm_service()
+        if not llm_service.is_available():
+            return jsonify({
+                "error": "AI service not configured. Please check API keys."
+            }), 503
+            
+        result = llm_service.analyze_fund(fund_data)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/fund/<fund_code>/basic', methods=['GET'])
 def get_fund_basic(fund_code):
@@ -2343,6 +2403,29 @@ def _run_backtest(nav_dict, dates, investment_type, amount, initial_amount, fee_
         'summary': summary,
         'timeline': timeline
     }
+
+def preload_services():
+    """
+    服务启动时的预加载任务
+    在后台线程执行，不阻塞服务启动
+    """
+    import threading
+    
+    def _preload():
+        import time
+        time.sleep(2)  # 等待服务完全启动
+        try:
+            llm_service = get_llm_service()
+            if llm_service.is_available():
+                llm_service.preload_market_summary()
+        except Exception as e:
+            print(f"Preload failed: {e}")
+    
+    thread = threading.Thread(target=_preload, daemon=True)
+    thread.start()
+
+# 启动预加载（在应用启动时执行）
+preload_services()
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
