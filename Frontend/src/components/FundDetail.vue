@@ -1,16 +1,28 @@
 <template>
   <div class="fund-detail">
     <!-- 基金基础信息组件 -->
-    <FundBasicInfo :fundCode="currentFundCode" :fundData="fundDetail" :riskMetrics="riskMetrics" />
+    <FundBasicInfo 
+      :fundCode="currentFundCode" 
+      :fundData="fundDetail" 
+      :riskMetrics="riskMetrics" 
+      @trigger-ai-analysis="handleStartAIAnalysis"
+    />
+
+    <!-- AI 智能分析区域 -->
+    <div v-show="showAIAnalysis" class="ai-analysis-section">
+      <FundAIAnalysis 
+        ref="fundAIAnalysisRef"
+        :fundCode="currentFundCode" 
+        @close="showAIAnalysis = false"
+        @analysis-complete="handleAnalysisComplete"
+      />
+    </div>
     
     <!-- 主要内容区域 - Dashboard 布局 -->
     <div v-if="fundDetail" class="dashboard">
       
       <!-- 左侧主区域 -->
       <div class="main-area">
-        <!-- AI 分析 -->
-        <FundAIAnalysis :fundCode="currentFundCode" />
-
         <!-- 净值走势图 -->
         <div class="card card-chart">
           <FundChart
@@ -196,20 +208,32 @@ export default {
     const error = ref('')
     const modalVisible = ref(false)
     const modalType = ref('')
+    const fundAIAnalysisRef = ref(null)
+    const showAIAnalysis = ref(false)
+    const aiAnalysisData = ref(null)
+
+    // 处理开启AI分析
+    const handleStartAIAnalysis = () => {
+      showAIAnalysis.value = true
+      // 等待DOM更新后调用分析方法
+      setTimeout(() => {
+        if (fundAIAnalysisRef.value) {
+          fundAIAnalysisRef.value.analyze()
+        }
+      }, 0)
+    }
+
+    // 处理AI分析完成
+    const handleAnalysisComplete = (data) => {
+      aiAnalysisData.value = data
+    }
 
     // 计算风险指标
     const riskMetrics = computed(() => {
-      if (!fundDetail.value?.net_worth_trend || fundDetail.value.net_worth_trend.length < 30) {
-        return null
-      }
-      
+      if (!fundDetail.value?.net_worth_trend) return null
+
       try {
-        const trend = fundDetail.value.net_worth_trend
-        const sortedData = [...trend].sort((a, b) => {
-          const dateA = new Date(a.date).getTime()
-          const dateB = new Date(b.date).getTime()
-          return dateA - dateB
-        })
+        const sortedData = [...fundDetail.value.net_worth_trend].sort((a, b) => new Date(a.date) - new Date(b.date))
         
         // 转换为净值数组
         const values = sortedData.map(item => parseFloat(item.net_worth)).filter(v => !isNaN(v))
@@ -452,7 +476,12 @@ export default {
       modalVisible,
       modalType,
       openModal,
-      closeModal
+      closeModal,
+      fundAIAnalysisRef,
+      showAIAnalysis,
+      handleStartAIAnalysis,
+      aiAnalysisData,
+      handleAnalysisComplete
     }
   }
 }
@@ -473,6 +502,17 @@ export default {
   grid-template-columns: 1fr 380px;
   gap: 16px;
   padding: 16px 0;
+}
+
+/* AI 分析区域 */
+.ai-analysis-section {
+  margin-bottom: 16px;
+  animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* 左侧主区域 */

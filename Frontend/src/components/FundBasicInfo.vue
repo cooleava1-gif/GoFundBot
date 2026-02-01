@@ -41,19 +41,33 @@
         </div>
       </div>
 
+      <!-- AI 分析按钮区域 -->
+      <div class="header-middle-group">
+        <button class="ai-analysis-btn" @click="$emit('trigger-ai-analysis')">
+          <span class="ai-icon">🤖</span>
+          <span class="btn-text">AI 智能分析</span>
+        </button>
+      </div>
+
       <div class="header-right">
+        <!-- 涨跌幅单独展示 -->
+        <div class="change-box">
+          <div class="label">估算涨幅</div>
+          <div class="value" :class="getChangeClass(fundInfo.gszzl)">
+            {{ fundInfo.gszzl ? (fundInfo.gszzl > 0 ? '+' : '') + fundInfo.gszzl + '%' : '--' }}
+          </div>
+        </div>
+        
         <div class="net-worth-box">
           <div class="label">单位净值</div>
           <div class="value">{{ fundInfo.dwjz || '--' }}</div>
           <div class="date">{{ formatDate(fundInfo.jzrq) }}</div>
         </div>
+        
         <div class="estimate-box">
           <div class="label">估算净值</div>
           <div class="value" :class="getChangeClass(fundInfo.gszzl)">
             {{ fundInfo.gsz || '--' }}
-          </div>
-          <div class="change" :class="getChangeClass(fundInfo.gszzl)">
-            {{ fundInfo.gszzl ? (fundInfo.gszzl > 0 ? '+' : '') + fundInfo.gszzl + '%' : '--' }}
           </div>
           <div class="time">{{ formatTime(fundInfo.gztime) }}</div>
         </div>
@@ -363,16 +377,52 @@ export default {
   font-weight: 500;
 }
 
-.header-right {
+.header-middle-group {
+  flex: 1;
   display: flex;
-  gap: 24px;
+  justify-content: center;
+  align-items: center;
 }
 
+.ai-analysis-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.ai-analysis-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.ai-icon {
+  font-size: 18px;
+}
+
+.header-right {
+  display: flex;
+  gap: 32px; /* 增加间距 */
+  align-items: flex-start;
+}
+
+.change-box,
 .net-worth-box,
 .estimate-box {
   text-align: right;
+  display: flex;
+  flex-direction: column;
 }
 
+.change-box .label,
 .net-worth-box .label,
 .estimate-box .label {
   font-size: 12px;
@@ -380,6 +430,7 @@ export default {
   margin-bottom: 4px;
 }
 
+.change-box .value,
 .net-worth-box .value,
 .estimate-box .value {
   font-size: 28px;
@@ -387,18 +438,7 @@ export default {
   line-height: 1.2;
 }
 
-.net-worth-box .date {
-  font-size: 11px;
-  opacity: 0.8;
-  margin-top: 4px;
-}
-
-.estimate-box .change {
-  font-size: 16px;
-  font-weight: 600;
-  margin-top: 2px;
-}
-
+.net-worth-box .date,
 .estimate-box .time {
   font-size: 11px;
   opacity: 0.8;

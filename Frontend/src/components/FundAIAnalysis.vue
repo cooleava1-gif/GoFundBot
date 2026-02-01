@@ -6,10 +6,13 @@
         <h3>AI 智能分析</h3>
         <span class="badge" v-if="data">已分析</span>
       </div>
-      <button v-if="!loading" @click="analyze" class="analyze-btn" :class="{ 'has-data': data }">
-        <span class="btn-icon">{{ data ? '🔄' : '✨' }}</span>
-        {{ data ? '重新分析' : '开始分析' }}
-      </button>
+      <div class="header-actions">
+        <button v-if="!loading" @click="analyze" class="analyze-btn" :class="{ 'has-data': data }">
+          <span class="btn-icon">{{ data ? '🔄' : '✨' }}</span>
+          {{ data ? '重新分析' : '开始分析' }}
+        </button>
+        <button class="close-btn" @click="$emit('close')" title="关闭">×</button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">
@@ -94,6 +97,15 @@
         </ul>
       </div>
 
+      <!-- 深度分析报告 -->
+      <div class="detailed-report" v-if="data.detailed_report">
+        <div class="report-header">
+          <span class="report-icon">📑</span>
+          <h4>深度分析报告</h4>
+        </div>
+        <div class="markdown-content" v-html="parsedReport"></div>
+      </div>
+
       <!-- 免责声明 -->
       <div class="disclaimer">
         💡 以上分析由 AI 生成，仅供参考，不构成投资建议。投资有风险，入市需谨慎。
@@ -119,9 +131,18 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['close', 'analysis-complete'])
+
 const data = ref(null)
 const loading = ref(false)
 const error = ref(null)
+
+// 监听数据变化，分析完成后通知父组件
+watch(data, (newVal) => {
+  if (newVal) {
+    emit('analysis-complete', newVal)
+  }
+})
 
 // 仪表盘配置
 const dashboardItems = {
@@ -156,6 +177,49 @@ const scoreProgress = computed(() => {
   if (!data.value) return '0 283'
   const progress = (data.value.sentiment_score / 100) * 283
   return `${progress} 283`
+})
+
+// 解析 Markdown
+const parsedReport = computed(() => {
+  if (!data.value || !data.value.detailed_report) return ''
+  const lines = data.value.detailed_report.split('\n')
+  let html = ''
+  let inList = false
+  
+  lines.forEach(line => {
+    line = line.trim()
+    if (!line) return
+    
+    // Header 3
+    if (line.startsWith('### ')) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<h4>${line.substring(4)}</h4>`
+    }
+    // Header 2
+    else if (line.startsWith('## ')) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<h3>${line.substring(3)}</h3>`
+    }
+    // List item
+    else if (line.startsWith('- ') || line.startsWith('* ')) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      let content = line.substring(2)
+      // Bold
+      content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      html += `<li>${content}</li>`
+    }
+    // Paragraph
+    else {
+      if (inList) { html += '</ul>'; inList = false; }
+      let content = line
+      content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      html += `<p>${content}</p>`
+    }
+  })
+  
+  if (inList) html += '</ul>'
+  
+  return html
 })
 
 // 建议样式类
@@ -207,6 +271,10 @@ watch(() => props.fundCode, () => {
   data.value = null
   error.value = null
 })
+
+defineExpose({
+  analyze
+})
 </script>
 
 <style scoped>
@@ -214,7 +282,6 @@ watch(() => props.fundCode, () => {
   background: white;
   border-radius: 12px;
   padding: 24px;
-  margin-bottom: 20px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   border: 1px solid #f0f0f0;
 }
@@ -250,41 +317,66 @@ watch(() => props.fundCode, () => {
   border-radius: 10px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .analyze-btn {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  font-size: 0.9em;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.analyze-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+.analyze-btn.mini {
+  background: #f0f0f0;
+  color: #666;
+  box-shadow: none;
 }
 
-.analyze-btn.has-data {
-  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+.analyze-btn.mini:hover {
+  background: #e0e0e0;
+  color: #333;
+  transform: none;
 }
 
-.btn-icon {
-  font-size: 1.1em;
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  font-size: 1.2em;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: #f5f5f5;
+  color: #666;
 }
 
 /* 评分区域 */
 .score-section {
   display: flex;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
   margin-bottom: 24px;
   align-items: center;
+  justify-content: center;
 }
 
 .score-card {
@@ -366,6 +458,63 @@ watch(() => props.fundCode, () => {
   border-left: 4px solid #1890ff;
 }
 
+/* 深度分析报告 */
+.detailed-report {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #eee;
+}
+
+.report-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.report-icon {
+  font-size: 1.4em;
+}
+
+.detailed-report h4 {
+  margin: 0;
+  font-size: 1.1em;
+  color: #333;
+}
+
+.markdown-content {
+  color: #444;
+  line-height: 1.6;
+}
+
+.markdown-content :deep(h3) {
+  font-size: 1.1em;
+  color: #1890ff;
+  margin: 16px 0 12px;
+  font-weight: 600;
+}
+
+.markdown-content :deep(h4) {
+  font-size: 1em;
+  color: #555;
+  margin: 12px 0 8px;
+  font-weight: 600;
+}
+
+.markdown-content :deep(p) {
+  margin-bottom: 12px;
+  text-align: justify;
+}
+
+.markdown-content :deep(ul) {
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+
+.markdown-content :deep(li) {
+  margin-bottom: 6px;
+}
+
 .summary-section p {
   margin: 0;
   line-height: 1.8;
@@ -375,7 +524,7 @@ watch(() => props.fundCode, () => {
 /* 仪表盘 */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }

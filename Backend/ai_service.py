@@ -20,7 +20,7 @@ import os
 import re
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from dotenv import load_dotenv
@@ -147,7 +147,7 @@ class AIService:
 {
     "sentiment_score": 75,
     "operation_advice": "持有观望",
-    "summary": "一句话总结基金投资价值和建议",
+    "summary": "详细的分析总结，包含业绩、风险、经理等维度的综合评价（200-300字）",
     "dashboard": {
         "performance_eval": "优秀/良好/一般/较差",
         "manager_ability": "优秀/良好/一般/较差",
@@ -156,13 +156,15 @@ class AIService:
     },
     "highlights": ["亮点1", "亮点2", "亮点3"],
     "risk_factors": ["风险1", "风险2", "风险3"],
-    "news_intel": ["相关市场信息1", "相关市场信息2"]
+    "news_intel": ["相关市场信息1", "相关市场信息2"],
+    "detailed_report": "Markdown格式的详细深度分析报告，包含：1. 业绩归因分析；2. 风险收益特征；3. 经理管理风格；4. 后市策略建议。请使用二级和三级标题组织内容。"
 }
 ```
 
 **评分说明**：
 - sentiment_score: 0-100 分，越高表示越值得投资
 - operation_advice: 可选值为 "强烈推荐"、"建议买入"、"持有观望"、"建议减仓"、"建议卖出"
+- detailed_report: 请提供不少于500字的深度分析，使用 Markdown 格式
 """
             
             # 调用 LLM
@@ -206,6 +208,32 @@ class AIService:
 - 估算涨跌：{realtime.get('estimate_change', '未知')}%
 - 估值时间：{realtime.get('estimate_time', '未知')}
 """
+        
+        # 添加业绩走势数据
+        total_return_trend = fund_data.get('total_return_trend', [])
+        if total_return_trend:
+            prompt += "\n## 业绩走势（累计收益率，近3年月度采样）\n"
+            for series in total_return_trend:
+                name = series.get('name', '未知')
+                data = series.get('data', [])
+                if not data: continue
+                
+                prompt += f"### {name}\n"
+                sorted_data = sorted(data, key=lambda x: x.get('date', ''))
+                sampled_points = []
+                seen_months = set()
+                
+                for point in reversed(sorted_data):
+                    date_str = point.get('date', '')
+                    if not date_str: continue
+                    month = date_str[:7]
+                    if month not in seen_months:
+                        sampled_points.insert(0, point)
+                        seen_months.add(month)
+                        if len(sampled_points) >= 36: break
+                
+                for p in sampled_points:
+                    prompt += f"- {p.get('date')}: {p.get('value')}%\n"
         
         # 添加风险指标
         if risk_metrics:
@@ -263,7 +291,7 @@ class AIService:
             
             # 验证必要字段
             required_fields = ['sentiment_score', 'operation_advice', 'summary', 
-                             'dashboard', 'highlights', 'risk_factors']
+                             'dashboard', 'highlights', 'risk_factors', 'detailed_report']
             for field in required_fields:
                 if field not in data:
                     data[field] = self._get_default_value(field)
@@ -285,7 +313,8 @@ class AIService:
                 },
                 "highlights": ["数据分析中"],
                 "risk_factors": ["请谨慎投资"],
-                "news_intel": []
+                "news_intel": [],
+                "detailed_report": result if result else "暂无详细分析"
             }
     
     def _get_default_value(self, field: str) -> Any:
@@ -302,7 +331,8 @@ class AIService:
             },
             'highlights': [],
             'risk_factors': [],
-            'news_intel': []
+            'news_intel': [],
+            'detailed_report': '暂无详细分析报告'
         }
         return defaults.get(field, None)
     
