@@ -1,76 +1,109 @@
 <template>
   <div class="fund-ai-analysis card">
     <div class="header">
-      <h3>🤖 AI 智能分析</h3>
-      <button v-if="!loading" @click="analyze" class="analyze-btn">
+      <div class="title-area">
+        <span class="icon">🤖</span>
+        <h3>AI 智能分析</h3>
+        <span class="badge" v-if="data">已分析</span>
+      </div>
+      <button v-if="!loading" @click="analyze" class="analyze-btn" :class="{ 'has-data': data }">
+        <span class="btn-icon">{{ data ? '🔄' : '✨' }}</span>
         {{ data ? '重新分析' : '开始分析' }}
       </button>
     </div>
 
     <div v-if="loading" class="loading">
-      <div class="spinner"></div>
-      <p>AI 正在深度分析基金表现与市场情报...</p>
+      <div class="loading-animation">
+        <div class="spinner"></div>
+        <div class="loading-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+      <p class="loading-text">AI 正在深度分析基金表现...</p>
+      <p class="loading-sub">结合市场数据、基金业绩、持仓结构进行综合评估</p>
     </div>
 
     <div v-else-if="error" class="error">
-      {{ error }}
+      <span class="error-icon">⚠️</span>
+      <p>{{ error }}</p>
+      <button @click="analyze" class="retry-btn">重试</button>
     </div>
 
     <div v-else-if="data" class="analysis-content">
-      <div class="overview">
-        <div class="score-card">
-          <div class="score" :class="scoreClass">{{ data.sentiment_score }}</div>
-          <div class="advice">{{ data.operation_advice }}</div>
+      <!-- 核心评分卡 -->
+      <div class="score-section">
+        <div class="score-card" :class="scoreColorClass">
+          <div class="score-ring">
+            <svg viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="#e8e8e8" stroke-width="8"/>
+              <circle cx="50" cy="50" r="45" fill="none" :stroke="scoreColor" stroke-width="8"
+                      :stroke-dasharray="scoreProgress" stroke-linecap="round"
+                      transform="rotate(-90 50 50)"/>
+            </svg>
+            <div class="score-value">{{ data.sentiment_score }}</div>
+          </div>
+          <div class="score-label">综合评分</div>
         </div>
-        <div class="summary">
-          {{ data.summary }}
+        <div class="advice-card" :class="adviceClass">
+          <div class="advice-icon">{{ adviceIcon }}</div>
+          <div class="advice-text">{{ data.operation_advice }}</div>
         </div>
       </div>
 
+      <!-- 分析摘要 -->
+      <div class="summary-section">
+        <p>{{ data.summary }}</p>
+      </div>
+
+      <!-- 仪表盘 -->
       <div class="dashboard-grid">
-        <div class="dash-item">
-          <label>业绩评价</label>
-          <span>{{ data.dashboard.performance_eval }}</span>
-        </div>
-        <div class="dash-item">
-          <label>经理能力</label>
-          <span>{{ data.dashboard.manager_ability }}</span>
-        </div>
-        <div class="dash-item">
-          <label>持仓结构</label>
-          <span>{{ data.dashboard.position_analysis }}</span>
-        </div>
-        <div class="dash-item">
-          <label>后市展望</label>
-          <span>{{ data.dashboard.market_outlook }}</span>
+        <div class="dash-item" v-for="(item, key) in dashboardItems" :key="key">
+          <div class="dash-icon">{{ item.icon }}</div>
+          <div class="dash-content">
+            <label>{{ item.label }}</label>
+            <span :class="getEvalClass(data.dashboard[key])">{{ data.dashboard[key] }}</span>
+          </div>
         </div>
       </div>
 
+      <!-- 亮点与风险 -->
       <div class="details-grid">
-        <div class="detail-col">
-          <h4>✅ 亮点</h4>
+        <div class="detail-col highlights">
+          <h4><span class="col-icon">✅</span> 投资亮点</h4>
           <ul>
-            <li v-for="(item, i) in data.highlights" :key="i">{{ item }}</li>
+            <li v-for="(item, i) in data.highlights" :key="i">
+              <span class="bullet">•</span>{{ item }}
+            </li>
           </ul>
         </div>
-        <div class="detail-col">
-          <h4>⚠️ 风险提示</h4>
+        <div class="detail-col risks">
+          <h4><span class="col-icon">⚠️</span> 风险提示</h4>
           <ul>
-            <li v-for="(item, i) in data.risk_factors" :key="i">{{ item }}</li>
+            <li v-for="(item, i) in data.risk_factors" :key="i">
+              <span class="bullet">•</span>{{ item }}
+            </li>
           </ul>
         </div>
       </div>
       
+      <!-- 实时情报 -->
       <div class="news-section" v-if="data.news_intel && data.news_intel.length">
-        <h4>📰 实时情报</h4>
+        <h4><span class="col-icon">📰</span> 实时情报</h4>
         <ul>
           <li v-for="(news, i) in data.news_intel" :key="i">{{ news }}</li>
         </ul>
       </div>
+
+      <!-- 免责声明 -->
+      <div class="disclaimer">
+        💡 以上分析由 AI 生成，仅供参考，不构成投资建议。投资有风险，入市需谨慎。
+      </div>
     </div>
     
     <div v-else class="empty-state">
-      <p>点击上方按钮，获取 AI 对该基金的实时深度分析报告</p>
+      <div class="empty-icon">🔮</div>
+      <p class="empty-title">点击上方按钮，获取 AI 对该基金的实时深度分析报告</p>
+      <p class="empty-sub">分析内容包括：业绩评价、经理能力、持仓分析、后市展望等</p>
     </div>
   </div>
 </template>
@@ -90,13 +123,67 @@ const data = ref(null)
 const loading = ref(false)
 const error = ref(null)
 
-const scoreClass = computed(() => {
+// 仪表盘配置
+const dashboardItems = {
+  performance_eval: { label: '业绩评价', icon: '📈' },
+  manager_ability: { label: '经理能力', icon: '👨‍💼' },
+  position_analysis: { label: '持仓结构', icon: '📊' },
+  market_outlook: { label: '后市展望', icon: '🔮' }
+}
+
+// 评分颜色类
+const scoreColorClass = computed(() => {
   if (!data.value) return ''
   const s = data.value.sentiment_score
-  if (s >= 80) return 'score-high'
-  if (s >= 60) return 'score-mid'
-  return 'score-low'
+  if (s >= 80) return 'score-excellent'
+  if (s >= 60) return 'score-good'
+  if (s >= 40) return 'score-normal'
+  return 'score-poor'
 })
+
+// 评分颜色
+const scoreColor = computed(() => {
+  if (!data.value) return '#1890ff'
+  const s = data.value.sentiment_score
+  if (s >= 80) return '#52c41a'
+  if (s >= 60) return '#1890ff'
+  if (s >= 40) return '#faad14'
+  return '#f5222d'
+})
+
+// 评分进度（SVG 圆环）
+const scoreProgress = computed(() => {
+  if (!data.value) return '0 283'
+  const progress = (data.value.sentiment_score / 100) * 283
+  return `${progress} 283`
+})
+
+// 建议样式类
+const adviceClass = computed(() => {
+  if (!data.value) return ''
+  const advice = data.value.operation_advice
+  if (advice.includes('推荐') || advice.includes('买入')) return 'advice-buy'
+  if (advice.includes('减仓') || advice.includes('卖出')) return 'advice-sell'
+  return 'advice-hold'
+})
+
+// 建议图标
+const adviceIcon = computed(() => {
+  if (!data.value) return '📊'
+  const advice = data.value.operation_advice
+  if (advice.includes('推荐') || advice.includes('买入')) return '🚀'
+  if (advice.includes('减仓') || advice.includes('卖出')) return '📉'
+  return '⏳'
+})
+
+// 获取评价类名
+const getEvalClass = (eval_text) => {
+  if (!eval_text) return ''
+  if (eval_text === '优秀' || eval_text === '乐观') return 'eval-excellent'
+  if (eval_text === '良好') return 'eval-good'
+  if (eval_text === '较差' || eval_text === '谨慎' || eval_text === '悲观') return 'eval-poor'
+  return 'eval-normal'
+}
 
 const analyze = async () => {
   if (!props.fundCode) return
@@ -125,104 +212,215 @@ watch(() => props.fundCode, () => {
 <style scoped>
 .fund-ai-analysis {
   background: white;
-  border-radius: 8px;
-  padding: 20px;
+  border-radius: 12px;
+  padding: 24px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid #f0f0f0;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
-.header h3 {
-  margin: 0;
+.title-area {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.title-area .icon {
+  font-size: 1.5em;
+}
+
+.title-area h3 {
+  margin: 0;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.badge {
+  background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+  color: white;
+  font-size: 0.7em;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
 .analyze-btn {
-  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 10px 20px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: opacity 0.3s;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .analyze-btn:hover {
-  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
 }
 
-.overview {
+.analyze-btn.has-data {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+}
+
+.btn-icon {
+  font-size: 1.1em;
+}
+
+/* 评分区域 */
+.score-section {
   display: flex;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 24px;
+  margin-bottom: 24px;
   align-items: center;
 }
 
 .score-card {
   text-align: center;
-  min-width: 100px;
 }
 
-.score {
-  font-size: 2.5em;
+.score-ring {
+  position: relative;
+  width: 100px;
+  height: 100px;
+}
+
+.score-ring svg {
+  width: 100%;
+  height: 100%;
+}
+
+.score-ring circle:last-child {
+  transition: stroke-dasharray 0.8s ease;
+}
+
+.score-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2em;
   font-weight: bold;
-  line-height: 1;
 }
 
-.score-high { color: #f5222d; }
-.score-mid { color: #fa8c16; }
-.score-low { color: #52c41a; }
+.score-excellent .score-value { color: #52c41a; }
+.score-good .score-value { color: #1890ff; }
+.score-normal .score-value { color: #faad14; }
+.score-poor .score-value { color: #f5222d; }
 
-.advice {
-  margin-top: 5px;
-  font-weight: bold;
-  color: #333;
+.score-label {
+  margin-top: 8px;
+  color: #666;
+  font-size: 0.9em;
 }
 
-.summary {
+.advice-card {
   flex: 1;
-  font-size: 1.1em;
-  line-height: 1.5;
-  color: #333;
-  background: #f9f9f9;
-  padding: 15px;
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-radius: 12px;
+  background: #f5f5f5;
 }
 
+.advice-buy {
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+}
+
+.advice-sell {
+  background: linear-gradient(135deg, #fff1f0 0%, #ffa39e 100%);
+}
+
+.advice-hold {
+  background: linear-gradient(135deg, #e6f7ff 0%, #91d5ff 100%);
+}
+
+.advice-icon {
+  font-size: 2em;
+}
+
+.advice-text {
+  font-size: 1.3em;
+  font-weight: 600;
+}
+
+/* 摘要区域 */
+.summary-section {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  padding: 16px 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  border-left: 4px solid #1890ff;
+}
+
+.summary-section p {
+  margin: 0;
+  line-height: 1.8;
+  color: #333;
+}
+
+/* 仪表盘 */
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
-  margin-bottom: 20px;
-  background: #f0f7ff;
-  padding: 15px;
-  border-radius: 6px;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .dash-item {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
-.dash-item label {
-  display: block;
-  font-size: 0.85em;
-  color: #666;
-  margin-bottom: 5px;
+.dash-item:hover {
+  background: #f0f0f0;
+  transform: translateY(-2px);
 }
 
-.dash-item span {
-  font-weight: bold;
-  color: #1890ff;
+.dash-icon {
+  font-size: 1.5em;
 }
 
+.dash-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-content label {
+  font-size: 0.8em;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.dash-content span {
+  font-weight: 600;
+  font-size: 1em;
+}
+
+.eval-excellent { color: #52c41a; }
+.eval-good { color: #1890ff; }
+.eval-normal { color: #666; }
+.eval-poor { color: #f5222d; }
+
+/* 详情网格 */
 .details-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -230,71 +428,221 @@ watch(() => props.fundCode, () => {
   margin-bottom: 20px;
 }
 
+.detail-col {
+  padding: 16px;
+  border-radius: 10px;
+}
+
+.detail-col.highlights {
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 50%);
+}
+
+.detail-col.risks {
+  background: linear-gradient(135deg, #fff7e6 0%, #ffe7ba 50%);
+}
+
 .detail-col h4 {
-  margin: 0 0 10px 0;
-  border-bottom: 2px solid #eee;
-  padding-bottom: 5px;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1em;
+}
+
+.col-icon {
+  font-size: 1.1em;
 }
 
 .detail-col ul {
-  padding-left: 20px;
+  list-style: none;
+  padding: 0;
   margin: 0;
 }
 
 .detail-col li {
-  margin-bottom: 5px;
-  color: #555;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.bullet {
+  color: #999;
+}
+
+/* 新闻区域 */
+.news-section {
+  background: #f9f9f9;
+  padding: 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
 }
 
 .news-section h4 {
-  margin: 0 0 10px 0;
-  color: #333;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .news-section ul {
-  padding-left: 20px;
+  list-style: none;
+  padding: 0;
   margin: 0;
 }
 
 .news-section li {
-  margin-bottom: 5px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #e8e8e8;
   color: #666;
   font-size: 0.9em;
 }
 
+.news-section li:last-child {
+  border-bottom: none;
+}
+
+/* 免责声明 */
+.disclaimer {
+  text-align: center;
+  color: #999;
+  font-size: 0.8em;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+/* 加载状态 */
 .loading {
   text-align: center;
-  padding: 40px;
+  padding: 60px 20px;
+}
+
+.loading-animation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 .spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #1890ff;
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 15px;
 }
+
+.loading-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.loading-dots span {
+  width: 8px;
+  height: 8px;
+  background: #667eea;
+  border-radius: 50%;
+  animation: bounce 1.4s ease-in-out infinite;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: 0s; }
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-.empty-state {
-  text-align: center;
-  padding: 30px;
-  color: #999;
-  background: #fafafa;
-  border-radius: 6px;
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
 }
 
-.error {
-  color: #f5222d;
-  padding: 20px;
+.loading-text {
+  font-size: 1.1em;
+  color: #333;
+  margin: 0;
+}
+
+.loading-sub {
+  font-size: 0.9em;
+  color: #999;
+  margin: 8px 0 0;
+}
+
+/* 空状态 */
+.empty-state {
   text-align: center;
+  padding: 50px 20px;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  border-radius: 10px;
+}
+
+.empty-icon {
+  font-size: 3em;
+  margin-bottom: 16px;
+}
+
+.empty-title {
+  font-size: 1em;
+  color: #666;
+  margin: 0 0 8px;
+}
+
+.empty-sub {
+  font-size: 0.85em;
+  color: #999;
+  margin: 0;
+}
+
+/* 错误状态 */
+.error {
+  text-align: center;
+  padding: 40px 20px;
   background: #fff1f0;
+  border-radius: 10px;
+}
+
+.error-icon {
+  font-size: 2em;
+}
+
+.error p {
+  color: #f5222d;
+  margin: 12px 0;
+}
+
+.retry-btn {
+  background: #f5222d;
+  color: white;
+  border: none;
+  padding: 8px 20px;
   border-radius: 6px;
+  cursor: pointer;
+}
+
+.retry-btn:hover {
+  background: #cf1322;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .score-section {
+    flex-direction: column;
+  }
 }
 </style>

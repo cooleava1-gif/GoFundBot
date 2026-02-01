@@ -199,4 +199,47 @@ export const backtestAPI = {
   }
 }
 
+// ==================== 市场数据 API ====================
+export const marketAPI = {
+  // 获取市场概览（汇总数据）
+  getOverview() {
+    return api.get('/market/overview')
+  },
+  
+  // 获取7x24快讯
+  getFlashNews(count = 20) {
+    return api.get(`/market/news?count=${count}`)
+  },
+  
+  // 获取行业板块排行
+  getSectorRank(limit = 50) {
+    return api.get(`/market/sectors?limit=${limit}`)
+  },
+  
+  // 获取市场指数
+  getMarketIndex() {
+    return api.get('/market/index')
+  },
+  
+  // 获取实时金价
+  getGoldRealtime() {
+    return api.get('/market/gold/realtime')
+  },
+  
+  // 获取历史金价
+  getGoldHistory(days = 10) {
+    return api.get(`/market/gold/history?days=${days}`)
+  },
+  
+  // 获取近7日成交量
+  getVolumeWeekly() {
+    return api.get('/market/volume')
+  },
+  
+  // 获取近30分钟上证指数
+  getSSE30min() {
+    return api.get('/market/sse')
+  }
+}
+
 export default api

@@ -3,8 +3,9 @@ flask-cors==4.0.0
 requests==2.31.0
 sqlalchemy>=2.0.25
 python-dotenv==1.0.0
-google-generativeai
-openai
+openai>=1.0.0
 tenacity
-tavily-python
-google-search-results
+curl_cffi>=0.5.0
+lxml>=4.9.0
+langchain>=0.1.0
+langchain-openai>=0.0.5

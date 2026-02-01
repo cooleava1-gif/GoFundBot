@@ -6,7 +6,8 @@ from models import (FundBasicInfo, FundTrend, FundEstimate, FundPortfolio,
                     FundRiskMetrics, FundScreeningRank)
 from fund_api import FundAPI
 from fund_list_cache import get_fund_list_cache
-from llm_service import get_llm_service
+from ai_service import get_ai_service
+from fund_master_routes import fund_master_bp
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, and_, or_, func
 from datetime import datetime, timedelta
@@ -19,6 +20,9 @@ import requests
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
+
+# 注册市场数据 Blueprint
+app.register_blueprint(fund_master_bp)
 
 def get_db():
     if 'db' not in g:
@@ -313,40 +317,49 @@ def get_fund_detail(fund_code):
 @app.route('/api/market/daily', methods=['GET'])
 def get_daily_market():
     """
-    获取每日市场行情摘要
+    获取每日市场行情摘要（AI 驱动）
     
     优化后的接口特性：
-    1. 使用数据库持久化缓存，避免服务重启丢失
-    2. 支持后台异步生成，不阻塞请求
-    3. 返回 loading 状态时，前端可轮询等待
-    4. 支持 ?refresh=true 强制刷新
+    1. 使用硅基流动 API 进行 AI 分析
+    2. 整合市场数据后生成摘要
+    3. 支持 ?refresh=true 强制刷新
     
     Returns:
-        - 成功: {market_sentiment, summary, indices, ...}
-        - 加载中: {loading: true, message: "..."}
+        - 成功: {market_sentiment, summary, key_points, ...}
         - 错误: {error: "..."}
     """
-    force_refresh = request.args.get('refresh', 'false').lower() == 'true'
-    
     try:
-        llm_service = get_llm_service()
-        if not llm_service.is_available():
-            return jsonify({"error": "AI service not configured"}), 503
-            
-        result = llm_service.generate_market_summary(force_refresh=force_refresh)
+        ai_service = get_ai_service()
+        if not ai_service.is_available():
+            return jsonify({"error": "AI service not configured. Please set LLM_API_KEY in .env"}), 503
         
-        # 如果是 loading 状态，返回 202 Accepted
-        if result.get('loading'):
-            return jsonify(result), 202
-            
+        # 从 fund_master_routes 获取市场数据
+        from fund_master_service import FundMasterService
+        service = FundMasterService()
+        
+        market_data = {
+            'indices': service.get_market_overview(),
+            'sectors': service.get_sector_rank(),
+            'news': service.get_flash_news()[:10]
+        }
+        
+        result = ai_service.generate_market_summary(market_data)
         return jsonify(result)
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/fund/<fund_code>/analyze', methods=['GET'])
 def analyze_fund(fund_code):
     """
-    使用 AI 分析基金，结合实时市场新闻
+    使用 AI 分析基金（基于硅基流动 API）
+    
+    分析内容包括：
+    - 基金业绩评价
+    - 基金经理能力
+    - 持仓结构分析
+    - 后市展望
+    - 亮点与风险提示
     """
     if not fund_code:
         return jsonify({"error": "Fund code is required"}), 400
@@ -356,15 +369,15 @@ def analyze_fund(fund_code):
     if not fund_data:
         return jsonify({"error": "Fund data not found"}), 404
         
-    # 2. 调用 LLM 服务进行分析
+    # 2. 调用 AI 服务进行分析
     try:
-        llm_service = get_llm_service()
-        if not llm_service.is_available():
+        ai_service = get_ai_service()
+        if not ai_service.is_available():
             return jsonify({
-                "error": "AI service not configured. Please check API keys."
+                "error": "AI service not configured. Please set LLM_API_KEY in .env file."
             }), 503
             
-        result = llm_service.analyze_fund(fund_data)
+        result = ai_service.analyze_fund(fund_data)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2415,9 +2428,9 @@ def preload_services():
         import time
         time.sleep(2)  # 等待服务完全启动
         try:
-            llm_service = get_llm_service()
-            if llm_service.is_available():
-                llm_service.preload_market_summary()
+            ai_service = get_ai_service()
+            if ai_service.is_available():
+                print("AI 服务已就绪（硅基流动 API）")
         except Exception as e:
             print(f"Preload failed: {e}")
     
