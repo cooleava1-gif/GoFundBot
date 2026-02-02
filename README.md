@@ -54,7 +54,7 @@ GoFundBot 是一个基于 Python (Flask) 和 Vue 3 构建的智能基金分析�
 
 - 使用LLM辅助分析基金情况（结论仅供参考）
 
-![LLM分析](docs/images/LLM.png)
+![LLM分析](docs/images/LLM分析.png)
 
 #### （3）基金筛选
 
