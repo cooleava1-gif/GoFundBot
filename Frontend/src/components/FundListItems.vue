@@ -154,7 +154,7 @@ export default {
 .change-down { color: #10b981; }
 .change-flat { color: #9ca3af; }
 
-.checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #667eea; }
+.checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #1677ff; }
 
 .drag-handle { cursor: grab; color: #9ca3af; font-size: 14px; user-select: none; }
 .drag-handle:active { cursor: grabbing; }
@@ -162,10 +162,10 @@ export default {
 .btn-compare {
   width: 22px;
   height: 22px;
-  border: 2px solid #667eea;
+  border: 2px solid #1677ff;
   border-radius: 50%;
   background: white;
-  color: #667eea;
+  color: #1677ff;
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
@@ -176,12 +176,12 @@ export default {
 }
 
 .btn-compare:hover {
-  background: #667eea;
+  background: #1677ff;
   color: white;
 }
 
 .btn-compare.in-compare {
-  background: #667eea;
+  background: #1677ff;
   color: white;
 }
 

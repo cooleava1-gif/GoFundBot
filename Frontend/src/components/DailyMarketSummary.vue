@@ -268,7 +268,7 @@ onUnmounted(() => {
 
 <style scoped>
 .daily-market-summary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   border-radius: 16px;
   padding: 4px;
   margin: 20px 0;
@@ -310,7 +310,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -318,12 +318,12 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 0.9em;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.3);
 }
 
 .refresh-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.4);
 }
 
 /* ============ 加载状态样式 ============ */
@@ -351,7 +351,7 @@ onUnmounted(() => {
 .pulse-dot {
   width: 12px;
   height: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   border-radius: 50%;
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -378,7 +378,7 @@ onUnmounted(() => {
 }
 
 .step-item.active {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(22, 119, 255, 0.1) 0%, rgba(9, 88, 217, 0.1) 100%);
 }
 
 .step-item.completed {
@@ -409,9 +409,9 @@ onUnmounted(() => {
 }
 
 .step-item.active .step-circle {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.4);
 }
 
 .step-item.completed .step-circle {
@@ -476,7 +476,7 @@ onUnmounted(() => {
 }
 
 .status-message {
-  color: #667eea;
+  color: #1677ff;
   font-weight: 500;
   margin-bottom: 8px;
 }
@@ -578,7 +578,7 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #f8f9ff 0%, #f0f5ff 100%);
   border-radius: 12px;
   margin-bottom: 28px;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid #1677ff;
 }
 
 .summary-icon {
@@ -684,7 +684,7 @@ onUnmounted(() => {
 }
 
 .tag {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   padding: 6px 14px;
   border-radius: 20px;
@@ -708,7 +708,7 @@ onUnmounted(() => {
 }
 
 .news-bullet {
-  color: #667eea;
+  color: #1677ff;
   font-weight: bold;
   flex-shrink: 0;
 }

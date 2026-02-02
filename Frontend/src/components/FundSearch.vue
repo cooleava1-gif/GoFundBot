@@ -178,13 +178,13 @@ export default {
 
 .search-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
 }
 
 .search-btn {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -196,7 +196,7 @@ export default {
 
 .search-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.3);
 }
 
 .db-status {
@@ -235,7 +235,7 @@ export default {
 }
 
 .update-btn:hover:not(:disabled) {
-  background: #667eea;
+  background: #1677ff;
   color: white;
   transform: rotate(180deg);
 }
@@ -249,7 +249,7 @@ export default {
   width: 14px;
   height: 14px;
   border: 2px solid #e5e7eb;
-  border-top-color: #667eea;
+  border-top-color: #1677ff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -288,7 +288,7 @@ export default {
 
 .fund-code {
   font-weight: 600;
-  color: #667eea;
+  color: #1677ff;
   font-family: 'SF Mono', Monaco, monospace;
   font-size: 13px;
   min-width: 60px;

@@ -247,11 +247,11 @@ export default {
 
 <style>
 :root {
-  --primary-color: #7B8D9E;
-  --primary-gradient: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
-  --success-color: #10b981;
-  --danger-color: #ef4444;
-  --warning-color: #f59e0b;
+  --primary-color: #1677ff;
+  --primary-gradient: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+  --success-color: #52c41a;
+  --danger-color: #ff4d4f;
+  --warning-color: #faad14;
   --text-primary: #1f2937;
   --text-secondary: #6b7280;
   --text-tertiary: #9ca3af;
@@ -427,7 +427,7 @@ export default {
 .welcome-icon {
   font-size: 48px;
   margin-bottom: 16px;
-  background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+  background: linear-gradient(135deg, #1677ff20 0%, #0958d920 100%);
   width: 80px;
   height: 80px;
   line-height: 80px;

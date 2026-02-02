@@ -610,7 +610,7 @@ export default {
 .header-icon { font-size: 18px; }
 
 .count-badge {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: #fff;
   font-size: 11px;
   padding: 2px 8px;
@@ -635,7 +635,7 @@ export default {
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-add-group { background: #f0fdf4; color: #16a34a; }
 .btn-add-group:hover { background: #dcfce7; }
-.btn-edit { background: #f3f4f6; color: #667eea; }
+.btn-edit { background: #f3f4f6; color: #1677ff; }
 .btn-edit:hover { background: #e5e7eb; }
 .btn-danger { background: #fef2f2; color: #ef4444; }
 .btn-danger:hover:not(:disabled) { background: #fee2e2; }
@@ -643,7 +643,9 @@ export default {
 .btn-secondary:hover { background: #e5e7eb; }
 .btn-refresh { background: #ecfdf5; color: #10b981; padding: 5px 8px; display: inline-flex; align-items: center; justify-content: center; }
 .btn-refresh:hover:not(:disabled) { background: #d1fae5; }
-.btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+.btn-primary {
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+  color: white; }
 .btn-primary:hover:not(:disabled) { opacity: 0.9; }
 
 /* 旋转动画 */
@@ -684,7 +686,7 @@ export default {
   width: 32px;
   height: 32px;
   border: 3px solid #e5e7eb;
-  border-top-color: #667eea;
+  border-top-color: #1677ff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -811,7 +813,7 @@ export default {
 
 .modal-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #1677ff;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 

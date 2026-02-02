@@ -193,7 +193,7 @@ export default {
           },
           splitArea: {
             areaStyle: {
-              color: ['rgba(102, 126, 234, 0.05)', 'rgba(102, 126, 234, 0.1)']
+              color: ['rgba(22, 119, 255, 0.05)', 'rgba(22, 119, 255, 0.1)']
             }
           }
         },
@@ -203,14 +203,14 @@ export default {
             value: ability.scores,
             name: '能力评估',
             areaStyle: {
-              color: 'rgba(102, 126, 234, 0.3)'
+              color: 'rgba(22, 119, 255, 0.3)'
             },
             lineStyle: {
-              color: '#667eea',
+              color: '#1677ff',
               width: 2
             },
             itemStyle: {
-              color: '#667eea'
+              color: '#1677ff'
             }
           }]
         }]
@@ -262,7 +262,7 @@ export default {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   padding: 12px 16px;
   flex-shrink: 0;
 }
@@ -350,7 +350,7 @@ export default {
   color: #333;
   margin-bottom: 8px;
   padding-left: 6px;
-  border-left: 2px solid #667eea;
+  border-left: 2px solid #1677ff;
 }
 
 .manager-ability {
@@ -375,7 +375,7 @@ export default {
 }
 
 .ability-score strong {
-  color: #667eea;
+  color: #1677ff;
   font-size: 14px;
 }
 

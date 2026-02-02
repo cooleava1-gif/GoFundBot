@@ -22,7 +22,7 @@
           <span></span><span></span><span></span>
         </div>
       </div>
-      <p class="loading-text">AI 正在深度分析基金表现...</p>
+      <p class="loading-text">AI 正在深度分析基金表现(可能需要2-3分钟)...</p>
       <p class="loading-sub">结合市场数据、基金业绩、持仓结构进行综合评估</p>
     </div>
 
@@ -164,10 +164,10 @@ const scoreColorClass = computed(() => {
 
 // 评分颜色
 const scoreColor = computed(() => {
-  if (!data.value) return '#1890ff'
+  if (!data.value) return '#1677ff'
   const s = data.value.sentiment_score
   if (s >= 80) return '#52c41a'
-  if (s >= 60) return '#1890ff'
+  if (s >= 60) return '#1677ff'
   if (s >= 40) return '#faad14'
   return '#f5222d'
 })
@@ -324,7 +324,7 @@ defineExpose({
 }
 
 .analyze-btn {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   border: none;
   padding: 6px 12px;
@@ -408,7 +408,7 @@ defineExpose({
 }
 
 .score-excellent .score-value { color: #52c41a; }
-.score-good .score-value { color: #1890ff; }
+.score-good .score-value { color: #1677ff; }
 .score-normal .score-value { color: #faad14; }
 .score-poor .score-value { color: #f5222d; }
 
@@ -455,7 +455,7 @@ defineExpose({
   padding: 16px 20px;
   border-radius: 10px;
   margin-bottom: 20px;
-  border-left: 4px solid #1890ff;
+  border-left: 4px solid #1677ff;
 }
 
 /* 深度分析报告 */
@@ -681,7 +681,7 @@ defineExpose({
   width: 50px;
   height: 50px;
   border: 4px solid #f3f3f3;
-  border-top: 4px solid #667eea;
+  border-top: 4px solid #1677ff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -694,7 +694,7 @@ defineExpose({
 .loading-dots span {
   width: 8px;
   height: 8px;
-  background: #667eea;
+  background: #1677ff;
   border-radius: 50%;
   animation: bounce 1.4s ease-in-out infinite;
 }

@@ -1,4 +1,4 @@
-﻿<!-- 市场数据仪表盘 - 整合所有市场相关组件 -->
+<!-- 市场数据仪表盘 - 整合所有市场相关组件 -->
 <template>
   <div class="market-dashboard">
     <div class="dashboard-header">
@@ -100,7 +100,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   border-bottom: 1px solid var(--border-color, #e8e8e8);
 }
 
@@ -139,7 +139,7 @@ export default {
 
 .tab-btn.active {
   background: #fff;
-  color: #667eea;
+  color: #1677ff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 

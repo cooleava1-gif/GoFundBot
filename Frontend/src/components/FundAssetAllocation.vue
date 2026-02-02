@@ -41,7 +41,7 @@ export default {
     const series = computed(() => props.assetAllocation?.series || [])
     const hasData = computed(() => categories.value.length > 0 && series.value.length > 0)
 
-    const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc']
+    const colors = ['#1677ff', '#52c41a', '#faad14', '#ff4d4f', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc']
 
     const getColor = (index) => colors[index % colors.length]
 
@@ -189,7 +189,7 @@ export default {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   padding: 12px 16px;
   flex-shrink: 0;

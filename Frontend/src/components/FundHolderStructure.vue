@@ -58,16 +58,16 @@ export default {
     const hasData = computed(() => categories.value.length > 0 && series.value.length > 0)
 
     const colors = {
-      '机构持有比例': '#5470c6', // 蓝色
+      '机构持有比例': '#1677ff', // 蓝色
       '个人持有比例': '#ee6666', // 红色
-      '内部持有比例': '#91cc75', // 绿色
-      '机构持有': '#5470c6',
+      '内部持有比例': '#52c41a', // 绿色
+      '机构持有': '#1677ff',
       '个人持有': '#ee6666',
-      '内部持有': '#91cc75'
+      '内部持有': '#52c41a'
     }
 
     const getColor = (name) => {
-      return colors[name] || '#5470c6'
+      return colors[name] || '#1677ff'
     }
 
     const formatLegendName = (name) => {
@@ -189,7 +189,7 @@ export default {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   padding: 12px 16px;
   flex-shrink: 0;
 }

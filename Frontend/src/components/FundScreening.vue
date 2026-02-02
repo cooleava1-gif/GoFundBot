@@ -1182,7 +1182,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
 }
 
@@ -1232,7 +1232,7 @@ export default {
   gap: 8px;
   padding: 10px 20px;
   background: white;
-  color: #667eea;
+  color: #1677ff;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -1357,13 +1357,13 @@ export default {
 }
 
 .mode-tab:hover {
-  border-color: #667eea;
+  border-color: #1677ff;
 }
 
 .mode-tab.active {
-  border-color: #667eea;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  color: #667eea;
+  border-color: #1677ff;
+  background: linear-gradient(135deg, rgba(22, 119, 255, 0.1) 0%, rgba(9, 88, 217, 0.1) 100%);
+  color: #1677ff;
 }
 
 .mode-desc {
@@ -1378,7 +1378,7 @@ export default {
 .btn-start-update {
   width: 100%;
   padding: 14px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -1445,7 +1445,7 @@ export default {
 
 .progress-mode {
   font-size: 14px;
-  color: #667eea;
+  color: #1677ff;
   font-weight: 500;
   margin-bottom: 12px;
 }
@@ -1475,7 +1475,7 @@ export default {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   transition: width 0.3s;
 }
 
@@ -1538,13 +1538,13 @@ export default {
 }
 
 .strategy-card:hover {
-  border-color: #667eea;
+  border-color: #1677ff;
   transform: translateY(-2px);
 }
 
 .strategy-card.active {
-  border-color: #667eea;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-color: #1677ff;
+  background: linear-gradient(135deg, rgba(22, 119, 255, 0.1) 0%, rgba(9, 88, 217, 0.1) 100%);
 }
 
 .strategy-name {
@@ -1625,7 +1625,7 @@ export default {
 
 .selected-count {
   font-size: 12px;
-  color: #667eea;
+  color: #1677ff;
   font-weight: normal;
   margin-left: 6px;
 }
@@ -1692,11 +1692,11 @@ export default {
 }
 
 .category-checkbox:hover {
-  border-color: #667eea;
+  border-color: #1677ff;
 }
 
 .category-checkbox.checked {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   border-color: transparent;
 }
 
@@ -1741,11 +1741,11 @@ export default {
 }
 
 .type-tag.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   border-color: transparent;
   color: white;
   font-weight: 500;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.3);
 }
 
 /* 筛选指标网格 */
@@ -1828,7 +1828,7 @@ export default {
 
 .btn-search {
   padding: 12px 48px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   border: none;
   border-radius: 25px;
@@ -1836,12 +1836,12 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.35);
+  box-shadow: 0 4px 15px rgba(22, 119, 255, 0.35);
 }
 
 .btn-search:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45);
+  box-shadow: 0 6px 20px rgba(22, 119, 255, 0.45);
 }
 
 .btn-search:active {
@@ -2085,7 +2085,7 @@ export default {
 
 .fund-code {
   font-family: monospace;
-  color: #667eea;
+  color: #1677ff;
   font-weight: 600;
 }
 
@@ -2230,7 +2230,7 @@ export default {
   width: 40px;
   height: 40px;
   border-width: 3px;
-  border-color: #667eea;
+  border-color: #1677ff;
   border-top-color: transparent;
   margin-bottom: 16px;
 }

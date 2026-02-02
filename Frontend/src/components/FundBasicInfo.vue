@@ -288,7 +288,7 @@ export default {
 
 <style scoped>
 .fund-basic-info {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   padding: 24px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);

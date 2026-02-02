@@ -553,35 +553,54 @@ class FundMasterService:
             return {"success": False, "error": str(e), "data": []}
     
     # ==================== 市场指数分时数据 ====================
-    def _get_eastmoney_intraday(self, secid: str, name: str) -> list:
+    def _get_tencent_intraday(self, code: str) -> list:
         """
-        获取东方财富分时数据（内部通用方法）
+        获取腾讯财经分时数据
+        code: sh000001 (上证), sz399001 (深证), sh000300 (沪深300)
         """
         try:
-            url = "http://push2.eastmoney.com/api/qt/stock/trends2/get"
+            url = "https://web.ifzq.gtimg.cn/appstock/app/minute/query"
             params = {
-                "fields1": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13",
-                "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
-                "secid": secid,
-                "ndays": "1",
-                "iscr": "0",
-                "iscca": "0"
+                "code": code,
+                "_": int(time.time() * 1000)
             }
             
-            response = requests.get(url, params=params, timeout=10)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://gu.qq.com/"
+            }
+            
+            response = requests.get(url, params=params, headers=headers, timeout=10)
             data = response.json()
             
-            if data and data.get("data") and data["data"].get("trends"):
-                trends = data["data"]["trends"]
-                pre_close = data["data"].get("prePrice", 0)
+            # 解析数据结构: data -> code -> data -> data
+            if data and data.get("code") == 0:
+                stock_data = data.get("data", {}).get(code, {})
+                minute_data = stock_data.get("data", {}).get("data", [])
+                qt_data = stock_data.get("qt", {}).get(code, [])
+                
+                # 获取昨收价用于计算涨跌幅
+                pre_close = 0
+                if qt_data and len(qt_data) >= 5:
+                    try:
+                        pre_close = float(qt_data[4])
+                    except:
+                        pass
+                
+                if not pre_close and "prec" in stock_data.get("data", {}):
+                     try:
+                        pre_close = float(stock_data["data"]["prec"])
+                     except:
+                        pass
                 
                 result = []
-                for point in trends:
-                    # 格式: time, open, close, high, low, volume, amount, avg
-                    parts = point.split(",")
-                    if len(parts) >= 3:
-                        time_str = parts[0].split(" ")[1] # 取 HH:MM
-                        price = float(parts[2])
+                for point in minute_data:
+                    # 格式: "0930 3350.12 12345 67890" (时间 价格 交易量 成交额)
+                    parts = point.split(" ")
+                    if len(parts) >= 2:
+                        raw_time = parts[0]
+                        time_str = f"{raw_time[:2]}:{raw_time[2:]}" # 0930 -> 09:30
+                        price = float(parts[1])
                         
                         # 计算涨跌
                         change = 0
@@ -591,14 +610,10 @@ class FundMasterService:
                             pct = (change / pre_close) * 100
                             change_pct = f"{round(pct, 2)}%"
                         
-                        # 成交量处理
-                        volume = parts[5]
-                        try:
-                            vol_num = float(volume)
-                            if vol_num > 10000:
-                                volume = f"{round(vol_num / 10000, 2)}万"
-                        except:
-                            pass
+                        # 成交量处理 (腾讯返回的是手，不是金额或股数，这里简单处理)
+                        volume = "-"
+                        if len(parts) >= 3:
+                            volume = parts[2]
                             
                         result.append({
                             "time": time_str,
@@ -610,12 +625,13 @@ class FundMasterService:
                 return result
             return []
         except Exception as e:
-            print(f"Error fetching intraday for {secid}: {e}")
+            print(f"Error fetching tencent intraday for {code}: {e}")
             return []
 
     def get_indices_intraday(self) -> dict:
         """
         获取多指数分时数据（上证、深证、沪深300）
+        使用腾讯财经作为数据源
         
         Returns:
             dict: {'sh': [], 'sz': [], 'hs300': [], 'update_time': str}
@@ -625,9 +641,9 @@ class FundMasterService:
         if cached:
             return cached
             
-        sh_data = self._get_eastmoney_intraday("1.000001", "上证指数")
-        sz_data = self._get_eastmoney_intraday("0.399001", "深证成指")
-        hs300_data = self._get_eastmoney_intraday("1.000300", "沪深300")
+        sh_data = self._get_tencent_intraday("sh000001")
+        sz_data = self._get_tencent_intraday("sz399001")
+        hs300_data = self._get_tencent_intraday("sh000300")
         
         data = {
             "success": True,

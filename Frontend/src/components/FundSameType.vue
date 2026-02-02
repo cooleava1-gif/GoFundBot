@@ -145,12 +145,12 @@ export default {
 }
 
 .period-tab:hover {
-  border-color: #7B8D9E;
-  color: #7B8D9E;
+  border-color: #1677ff;
+  color: #1677ff;
 }
 
 .period-tab.active {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   border-color: transparent;
 }

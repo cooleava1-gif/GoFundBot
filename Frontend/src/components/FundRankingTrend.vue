@@ -281,7 +281,7 @@ export default {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   padding: 10px 16px;
   flex-shrink: 0;
@@ -320,7 +320,7 @@ export default {
 
 .range-btn.active {
   background: white;
-  color: #7B8D9E;
+  color: #1677ff;
   font-weight: 600;
 }
 

@@ -276,7 +276,7 @@ export default {
     const maxFunds = 5
     let chartInstance = null
 
-    const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4']
+    const colors = ['#1677ff', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4']
 
     const timeRanges = [
       { label: '近3月', value: '3m' },
@@ -875,7 +875,7 @@ export default {
   width: 24px;
   height: 24px;
   border: 3px solid #f0f0f0;
-  border-top-color: #667eea;
+  border-top-color: #1677ff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -936,7 +936,7 @@ export default {
 .section-row td {
   background: #f8f9ff !important;
   font-weight: 600;
-  color: #667eea;
+  color: #1677ff;
   text-align: left !important;
   padding: 8px 12px;
 }

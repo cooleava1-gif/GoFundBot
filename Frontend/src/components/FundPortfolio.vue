@@ -94,7 +94,7 @@ export default {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   padding: 10px 14px;
   display: flex;
   justify-content: space-between;
@@ -173,7 +173,7 @@ export default {
 
 .col-code {
   width: 60px;
-  color: #667eea;
+  color: #1677ff;
   font-family: monospace;
   font-size: 11px;
 }

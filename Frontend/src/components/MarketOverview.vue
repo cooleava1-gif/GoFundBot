@@ -429,14 +429,14 @@ export default {
 }
 
 .tab-group span:hover {
-  color: #1890ff;
-  background: #e6f7ff;
+  color: #1677ff;
+  background: #e6f4ff;
 }
 
 .tab-group span.active {
-  color: #1890ff;
+  color: #1677ff;
   font-weight: bold;
-  background: #e6f7ff;
+  background: #e6f4ff;
 }
 
 /* 上证指数 */
@@ -544,7 +544,7 @@ td.down { color: #52c41a; }
   background: none;
   border: none;
   cursor: pointer;
-  color: #1890ff;
+  color: #1677ff;
 }
 
 .empty-state {

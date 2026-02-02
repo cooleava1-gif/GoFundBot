@@ -111,8 +111,8 @@ export default {
           data: scaleData,
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#667eea' },
-              { offset: 1, color: '#764ba2' }
+              { offset: 0, color: '#1677ff' },
+              { offset: 1, color: '#0958d9' }
             ])
           },
           label: {
@@ -158,7 +158,7 @@ export default {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
   color: white;
   padding: 12px 16px;
   flex-shrink: 0;
