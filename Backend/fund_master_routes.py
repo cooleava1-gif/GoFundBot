@@ -84,6 +84,16 @@ def get_a_volume_7days():
     return jsonify(service.get_a_volume_7days())
 
 
+@fund_master_bp.route('/indices/intraday', methods=['GET'])
+def get_indices_intraday():
+    """
+    获取多指数分时数据（上证、深证、沪深300）
+    GET /api/market/indices/intraday
+    """
+    service = get_fund_master_service()
+    return jsonify(service.get_indices_intraday())
+
+
 @fund_master_bp.route('/sse', methods=['GET'])
 def get_sse_30min():
     """

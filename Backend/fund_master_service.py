@@ -552,75 +552,108 @@ class FundMasterService:
         except Exception as e:
             return {"success": False, "error": str(e), "data": []}
     
-    # ==================== 近30分钟上证指数 ====================
-    def get_sse_30min(self) -> dict:
+    # ==================== 市场指数分时数据 ====================
+    def _get_eastmoney_intraday(self, secid: str, name: str) -> list:
         """
-        获取近30分钟上证指数分时数据
-        数据源：百度股市通
+        获取东方财富分时数据（内部通用方法）
+        """
+        try:
+            url = "http://push2.eastmoney.com/api/qt/stock/trends2/get"
+            params = {
+                "fields1": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
+                "secid": secid,
+                "ndays": "1",
+                "iscr": "0",
+                "iscca": "0"
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+            
+            if data and data.get("data") and data["data"].get("trends"):
+                trends = data["data"]["trends"]
+                pre_close = data["data"].get("prePrice", 0)
+                
+                result = []
+                for point in trends:
+                    # 格式: time, open, close, high, low, volume, amount, avg
+                    parts = point.split(",")
+                    if len(parts) >= 3:
+                        time_str = parts[0].split(" ")[1] # 取 HH:MM
+                        price = float(parts[2])
+                        
+                        # 计算涨跌
+                        change = 0
+                        change_pct = "0.00%"
+                        if pre_close:
+                            change = round(price - pre_close, 2)
+                            pct = (change / pre_close) * 100
+                            change_pct = f"{round(pct, 2)}%"
+                        
+                        # 成交量处理
+                        volume = parts[5]
+                        try:
+                            vol_num = float(volume)
+                            if vol_num > 10000:
+                                volume = f"{round(vol_num / 10000, 2)}万"
+                        except:
+                            pass
+                            
+                        result.append({
+                            "time": time_str,
+                            "price": str(price),
+                            "change": f"{'+' if change > 0 else ''}{change}",
+                            "change_pct": change_pct,
+                            "volume": volume
+                        })
+                return result
+            return []
+        except Exception as e:
+            print(f"Error fetching intraday for {secid}: {e}")
+            return []
+
+    def get_indices_intraday(self) -> dict:
+        """
+        获取多指数分时数据（上证、深证、沪深300）
         
         Returns:
-            dict: {'success': bool, 'data': list, 'update_time': str}
+            dict: {'sh': [], 'sz': [], 'hs300': [], 'update_time': str}
         """
-        cache_key = 'sse_30min'
+        cache_key = 'indices_intraday'
         cached = self._get_cache(cache_key)
         if cached:
             return cached
+            
+        sh_data = self._get_eastmoney_intraday("1.000001", "上证指数")
+        sz_data = self._get_eastmoney_intraday("0.399001", "深证成指")
+        hs300_data = self._get_eastmoney_intraday("1.000300", "沪深300")
         
-        try:
-            url = "https://finance.pae.baidu.com/vapi/v1/getquotation"
-            params = {
-                "srcid": "5353",
-                "all": "1",
-                "pointType": "string",
-                "group": "quotation_index_minute",
-                "query": "000001",
-                "code": "000001",
-                "market_type": "ab",
-                "newFormat": "1",
-                "name": "上证指数",
-                "finClientType": "pc"
+        data = {
+            "success": True,
+            "data": {
+                "sh": sh_data,
+                "sz": sz_data,
+                "hs300": hs300_data
+            },
+            "update_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        self._set_cache(cache_key, data, 'sse_30min') # 复用 sse_30min 的 TTL (1分钟)
+        return data
+
+    def get_sse_30min(self) -> dict:
+        """
+        获取上证指数分时数据（兼容旧接口，但提供全天数据）
+        """
+        # 直接复用新的分时数据获取逻辑，但只返回上证数据
+        full_data = self.get_indices_intraday()
+        if full_data["success"]:
+            return {
+                "success": True,
+                "data": full_data["data"]["sh"],
+                "update_time": full_data["update_time"]
             }
-            
-            response = self.baidu_session.get(url, params=params, timeout=10, verify=False)
-            
-            if str(response.json().get("ResultCode")) == "0":
-                market_data = response.json()["Result"]["newMarketData"]["marketData"][0]["p"]
-                points = market_data.split(";")[-30:]  # 最近30分钟
-                
-                result = []
-                for point in points:
-                    parts = point.split(",")
-                    if len(parts) >= 6:
-                        # 成交量、成交额单位转换
-                        volume = parts[4]
-                        amount = parts[5]
-                        try:
-                            volume = f"{round(float(volume) / 10000, 2)}万手"
-                            amount = f"{round(float(amount) / 10000 / 10000, 2)}亿"
-                        except:
-                            pass
-                        
-                        result.append({
-                            "time": parts[0],
-                            "price": parts[1],
-                            "change": parts[2],
-                            "change_pct": f"{parts[3]}%",
-                            "volume": volume,
-                            "amount": amount
-                        })
-                
-                data = {
-                    "success": True,
-                    "data": result,
-                    "update_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
-                self._set_cache(cache_key, data, 'sse_30min')
-                return data
-            
-            return {"success": False, "error": "获取上证指数数据失败", "data": []}
-        
-        except Exception as e:
-            return {"success": False, "error": str(e), "data": []}
+        return {"success": False, "error": "获取上证指数数据失败", "data": []}
     
     # ==================== 汇总数据接口 ====================
     def get_market_overview(self) -> dict:

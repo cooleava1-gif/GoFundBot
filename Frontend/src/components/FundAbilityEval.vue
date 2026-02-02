@@ -105,17 +105,17 @@ export default {
           },
           splitArea: {
             areaStyle: {
-              color: ['rgba(102, 126, 234, 0.05)', 'rgba(102, 126, 234, 0.1)']
+              color: ['rgba(123, 141, 158, 0.05)', 'rgba(123, 141, 158, 0.1)']
             }
           },
           axisLine: {
             lineStyle: {
-              color: 'rgba(102, 126, 234, 0.3)'
+              color: 'rgba(123, 141, 158, 0.3)'
             }
           },
           splitLine: {
             lineStyle: {
-              color: 'rgba(102, 126, 234, 0.3)'
+              color: 'rgba(123, 141, 158, 0.3)'
             }
           }
         },
@@ -125,14 +125,14 @@ export default {
             value: data,
             name: '能力评分',
             areaStyle: {
-              color: 'rgba(102, 126, 234, 0.3)'
+              color: 'rgba(123, 141, 158, 0.3)'
             },
             lineStyle: {
-              color: '#667eea',
+              color: '#7B8D9E',
               width: 2
             },
             itemStyle: {
-              color: '#667eea'
+              color: '#7B8D9E'
             }
           }]
         }]
@@ -174,7 +174,7 @@ export default {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
   padding: 10px 14px;
   flex-shrink: 0;
   display: flex;

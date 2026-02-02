@@ -247,8 +247,8 @@ export default {
 
 <style>
 :root {
-  --primary-color: #667eea;
-  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --primary-color: #7B8D9E;
+  --primary-gradient: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
   --success-color: #10b981;
   --danger-color: #ef4444;
   --warning-color: #f59e0b;

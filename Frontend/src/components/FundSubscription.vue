@@ -206,7 +206,7 @@ export default {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #9CADBD 0%, #7B8D9E 100%);
   padding: 10px 16px;
   flex-shrink: 0;
 }

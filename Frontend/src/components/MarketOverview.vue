@@ -1,14 +1,24 @@
 ﻿<template>
   <div class="market-overview-container">
-    <!-- 1. 近30分钟上证指数 (置顶 & 折线图) -->
+    <!-- 1. 市场指数实时走势 (置顶 & 折线图) -->
     <div class="market-section" v-if="showSSE30Min">
       <div class="section-header">
-        <h3>📉 上证指数实时走势 (近30分)</h3>
+        <h3>📉 市场指数实时走势</h3>
+        <div class="tab-group">
+          <span 
+            v-for="tab in tabs" 
+            :key="tab.key" 
+            :class="{ active: activeTab === tab.key }"
+            @click="activeTab = tab.key"
+          >
+            {{ tab.name }}
+          </span>
+        </div>
         <span class="update-tag" v-if="updateTime">{{ updateTime.split(' ')[1] }} 更新</span>
       </div>
       <div class="chart-container sse-chart-container">
-        <v-chart class="chart" :option="sseOption" autoresize v-if="sse30Min.length" />
-        <div v-else class="empty-state">A股未开盘</div>
+        <v-chart class="chart" :option="currentChartOption" autoresize v-if="hasCurrentData" />
+        <div v-else class="empty-state">暂无数据 ({{ activeTabName }})</div>
       </div>
     </div>
 
@@ -154,10 +164,21 @@ export default {
     const goldRealtime = ref([])
     const goldHistory = ref([])
     const aVolume = ref([])
-    const sse30Min = ref([])
     const updateTime = ref('')
     const goldHistoryExpanded = ref(true)
     let refreshTimer = null
+    
+    // 指数分时数据
+    const indicesIntraday = ref({ sh: [], sz: [], hs300: [] })
+    const activeTab = ref('sh')
+    const tabs = [
+      { key: 'sh', name: '上证指数' },
+      { key: 'sz', name: '深证成指' },
+      { key: 'hs300', name: '沪深300' }
+    ]
+
+    const activeTabName = computed(() => tabs.find(t => t.key === activeTab.value)?.name || '')
+    const hasCurrentData = computed(() => indicesIntraday.value[activeTab.value]?.length > 0)
     
     // 指数分组
     const indices = computed(() => {
@@ -169,12 +190,13 @@ export default {
       }
     })
 
-    // 上证指数图表配置
-    const sseOption = computed(() => {
-      if (!sse30Min.value.length) return {}
+    // 当前选中的指数图表配置
+    const currentChartOption = computed(() => {
+      const data = indicesIntraday.value[activeTab.value]
+      if (!data || !data.length) return {}
       
-      const times = sse30Min.value.map(i => i.time.split(' ')[1] || i.time)
-      const prices = sse30Min.value.map(i => parseFloat(i.price))
+      const times = data.map(i => i.time)
+      const prices = data.map(i => parseFloat(i.price))
       // 计算涨跌色：基于第一笔数据
       const basePrice = prices[0]
       const isUp = prices[prices.length - 1] >= basePrice
@@ -187,7 +209,7 @@ export default {
           formatter: (params) => {
             const p = params[0]
             if (!p) return ''
-            const item = sse30Min.value[p.dataIndex]
+            const item = data[p.dataIndex]
             return `
               <div>${item.time}</div>
               <div style="font-weight:bold;color:${color}">${item.price}</div>
@@ -297,9 +319,15 @@ export default {
           if (data.market_index?.success) marketIndex.value = data.market_index.data
           if (data.gold_realtime?.success) goldRealtime.value = data.gold_realtime.data
           if (data.a_volume_7days?.success) aVolume.value = data.a_volume_7days.data.reverse() // 按时间正序
-          if (data.sse_30min?.success) sse30Min.value = data.sse_30min.data
           updateTime.value = data.update_time
         }
+        
+        // 获取多指数分时数据
+        const intradayRes = await marketAPI.getIndicesIntraday()
+        if (intradayRes.data.success) {
+            indicesIntraday.value = intradayRes.data.data
+        }
+        
         if (props.showGoldHistory) {
           const historyRes = await marketAPI.getGoldHistory(10)
           if (historyRes.data.success) goldHistory.value = historyRes.data.data
@@ -344,9 +372,11 @@ export default {
       loading, fetchAll,
       marketIndex, indices,
       goldRealtime, goldHistory, goldHistoryExpanded,
-      aVolume, updateTime, sse30Min,
+      aVolume, updateTime, 
       formatDate, getChangeClass, getUpDnClass,
-      sseOption, volumeOption
+      volumeOption,
+      // New returns
+      tabs, activeTab, activeTabName, hasCurrentData, currentChartOption
     }
   }
 }
@@ -379,6 +409,34 @@ export default {
   margin: 0;
   font-size: 1.1em;
   color: #333;
+}
+
+.tab-group {
+  display: flex;
+  gap: 8px;
+  margin-left: 16px;
+  flex: 1;
+}
+
+.tab-group span {
+  font-size: 0.85em;
+  color: #666;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.tab-group span:hover {
+  color: #1890ff;
+  background: #e6f7ff;
+}
+
+.tab-group span.active {
+  color: #1890ff;
+  font-weight: bold;
+  background: #e6f7ff;
 }
 
 /* 上证指数 */

@@ -239,6 +239,11 @@ export const marketAPI = {
   // 获取近30分钟上证指数
   getSSE30min() {
     return api.get('/market/sse')
+  },
+
+  // 获取多指数分时数据
+  getIndicesIntraday() {
+    return api.get('/market/indices/intraday')
   }
 }
 
