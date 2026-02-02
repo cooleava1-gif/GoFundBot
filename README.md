@@ -38,7 +38,7 @@ GoFundBot 是一个基于 Python (Flask) 和 Vue 3 构建的智能基金分析�
 -  7×24 快讯（右侧边栏）：展示实时重要新闻及其影响行业。
 - 行业板块排行（右侧边栏）：展示当日强势板块和弱势板块、主力资金流动情况。
 
-![市场大盘.png](docs/images/市场大盘.png)
+![市场大盘.png](https://github.com/Sebastian6848/GoFundBot/blob/master/docs/images/%E5%B8%82%E5%9C%BA%E5%A4%A7%E7%9B%98.png)
 
 #### （2）基金详情页面
 
@@ -50,7 +50,7 @@ GoFundBot 是一个基于 Python (Flask) 和 Vue 3 构建的智能基金分析�
 - 基金经理能力评估：调用东方财富API，绘制经理能力雷达图。
 - 同类基金涨幅榜：辅助挑选同类型优质基金。
 
-![基金详情.png](docs/images/基金详情.png)
+![基金详情.png](https://github.com/Sebastian6848/GoFundBot/blob/master/docs/images/%E5%9F%BA%E9%87%91%E8%AF%A6%E6%83%85.png)
 
 - 使用LLM辅助分析基金情况（结论仅供参考）
 
