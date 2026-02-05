@@ -185,6 +185,7 @@ export default {
     // 顶部搜索框选中基金
     const handleHeaderSearch = (fundOrCode) => {
       compareMode.value = false // 退出对比模式
+      viewMode.value = 'dashboard' // 切换到市场大盘
       handleFundSelected(fundOrCode)
     }
     

@@ -104,6 +104,7 @@
             :groupId="null"
             :compareMode="compareMode"
             :compareFunds="compareFunds"
+            :addToRealtimeMode="addToRealtimeMode"
             @toggle-select="toggleSelect"
             @view-fund="viewFundDetail"
             @remove-fund="removeFund"
@@ -112,6 +113,7 @@
             @drag-over="onDragOver"
             @drop="onDrop"
             @add-to-compare="addToCompare"
+            @add-to-realtime="$emit('add-to-realtime', $event)"
           />
         </div>
       </div>
@@ -142,6 +144,7 @@
             :groupId="group.id"
             :compareMode="compareMode"
             :compareFunds="compareFunds"
+            :addToRealtimeMode="addToRealtimeMode"
             @toggle-select="toggleSelect"
             @view-fund="viewFundDetail"
             @remove-fund="removeFund"
@@ -150,6 +153,7 @@
             @drag-over="onDragOver"
             @drop="onDrop"
             @add-to-compare="addToCompare"
+            @add-to-realtime="$emit('add-to-realtime', $event)"
           />
           <div v-if="getGroupFunds(group.id).length === 0" class="group-empty">
             暂无基金，拖拽基金到此分组
@@ -192,9 +196,10 @@ export default {
   props: {
     compareMode: { type: Boolean, default: false },
     compareFunds: { type: Array, default: () => [] },
-    showCompareToggle: { type: Boolean, default: false }
+    showCompareToggle: { type: Boolean, default: false },
+    addToRealtimeMode: { type: Boolean, default: false }
   },
-  emits: ['view-fund', 'add-to-compare', 'toggle-compare'],
+  emits: ['view-fund', 'add-to-compare', 'toggle-compare', 'add-to-realtime'],
   setup(props, { emit }) {
     const watchlist = ref([])
     const groups = ref([])

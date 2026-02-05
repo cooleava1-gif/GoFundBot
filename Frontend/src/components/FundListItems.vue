@@ -60,7 +60,20 @@
 
       <!-- 操作按钮 -->
       <div class="col-action" v-if="!editMode && !compareMode">
-        <button class="btn-icon btn-remove" @click.stop="$emit('remove-fund', fund.fund_code)" title="移除">
+        <button 
+          v-if="addToRealtimeMode"
+          class="btn-icon btn-add-realtime" 
+          @click.stop="$emit('add-to-realtime', fund)" 
+          title="添加到实时估值"
+        >
+          +
+        </button>
+        <button 
+          v-else
+          class="btn-icon btn-remove" 
+          @click.stop="$emit('remove-fund', fund.fund_code)" 
+          title="移除"
+        >
           ✕
         </button>
       </div>
@@ -78,9 +91,10 @@ export default {
     draggingIndex: { type: Object, default: null },
     groupId: { type: [Number, null], default: null },
     compareMode: { type: Boolean, default: false },
-    compareFunds: { type: Array, default: () => [] }
+    compareFunds: { type: Array, default: () => [] },
+    addToRealtimeMode: { type: Boolean, default: false }
   },
-  emits: ['toggle-select', 'view-fund', 'remove-fund', 'drag-start', 'drag-end', 'drag-over', 'drop', 'add-to-compare'],
+  emits: ['toggle-select', 'view-fund', 'remove-fund', 'drag-start', 'drag-end', 'drag-over', 'drop', 'add-to-compare', 'add-to-realtime'],
   methods: {
     isDragging(index) {
       return this.draggingIndex && 
@@ -204,4 +218,15 @@ export default {
 }
 
 .btn-icon:hover { background: #fee2e2; color: #ef4444; }
+
+.btn-add-realtime {
+  font-size: 16px;
+  font-weight: bold;
+  color: #10b981;
+}
+
+.btn-add-realtime:hover {
+  background: #ecfdf5;
+  color: #059669;
+}
 </style>

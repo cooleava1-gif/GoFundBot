@@ -1,5 +1,13 @@
 <template>
-  <div class="realtime-container">
+  <div class="realtime-layout">
+    <aside class="realtime-sidebar">
+      <FundWatchlist 
+        :addToRealtimeMode="true"
+        @add-to-realtime="addFundToRealtime"
+      />
+    </aside>
+    <div class="realtime-main">
+      <div class="realtime-container">
     <!-- 头部 -->
     <div class="realtime-header">
       <div class="header-left">
@@ -209,14 +217,18 @@
         </div>
       </div>
     </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import FundWatchlist from './FundWatchlist.vue'
 
 export default {
   name: 'FundRealtime',
+  components: { FundWatchlist },
   setup() {
     // ==================== 状态 ====================
     const funds = ref([])
@@ -368,6 +380,10 @@ export default {
         selectedFunds.value = selectedFunds.value.filter(f => f.CODE !== fund.CODE)
       } else {
         selectedFunds.value = [...selectedFunds.value, fund]
+        // 选中后自动清空
+        searchTerm.value = ''
+        searchResults.value = []
+        showDropdown.value = false
       }
     }
 
@@ -558,6 +574,28 @@ export default {
       })
     }
 
+    // 从自选添加
+    const addFundToRealtime = async (fundInfo) => {
+      const code = fundInfo.fund_code || fundInfo.code || fundInfo.CODE
+      if (!code) return
+      
+      // 已存在检查
+      if (funds.value.some(f => f.code === String(code))) {
+         return 
+      }
+      
+      refreshing.value = true
+      try {
+        const data = await fetchFundData(String(code))
+        funds.value = [data, ...funds.value]
+        localStorage.setItem('realtime_funds', JSON.stringify(funds.value))
+      } catch(e) {
+          console.error(e)
+      } finally {
+          refreshing.value = false
+      }
+    }
+
     // 批量添加基金
     const batchAddFunds = async () => {
       if (selectedFunds.value.length === 0) return
@@ -745,6 +783,7 @@ export default {
       searchTerm,
       searchResults,
       selectedFunds,
+      addFundToRealtime,
       showDropdown,
       dropdownRef,
       holdingModal,
@@ -1406,5 +1445,42 @@ export default {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+/* New Layout Styles */
+.realtime-layout {
+  display: flex;
+  height: calc(100vh - 80px); /* Adjust for app header */
+  gap: 16px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.realtime-sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.realtime-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  /* Reset container styles if needed */
+}
+
+/* Adjust original container to fit inside main */
+.realtime-main .realtime-container {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: auto;
 }
 </style>
