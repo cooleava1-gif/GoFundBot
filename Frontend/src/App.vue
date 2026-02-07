@@ -45,6 +45,13 @@
             >
               💰 定投回测
             </button>
+            <button 
+              class="mode-btn" 
+              :class="{ active: viewMode === 'positions' }"
+              @click="viewMode = 'positions'"
+            >
+              💼 我的持仓
+            </button>
           </div>
         </div>
       </div>
@@ -117,6 +124,11 @@
             />
           </template>
 
+          <!-- 我的持仓模式 -->
+          <template v-else-if="viewMode === 'positions'">
+            <MyPositions />
+          </template>
+
           <!-- 详情模式 -->
           <template v-else>
             <FundSearch @fund-selected="handleFundSelected" />
@@ -148,6 +160,7 @@ import FundBacktest from './components/FundBacktest.vue'
 import MarketOverview from './components/MarketOverview.vue'
 import FlashNews from './components/FlashNews.vue'
 import SectorRank from './components/SectorRank.vue'
+import MyPositions from './components/MyPositions.vue'
 
 export default {
   name: 'App',
@@ -160,7 +173,8 @@ export default {
     FundBacktest,
     MarketOverview,
     FlashNews,
-    SectorRank
+    SectorRank,
+    MyPositions
   },
   setup() {
     const selectedFundCode = ref('')

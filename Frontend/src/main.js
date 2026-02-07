@@ -1,6 +1,6 @@
 // Frontend/src/main.js
 import { createApp } from 'vue'
-import App from './app.vue'
+import App from './App.vue'
 
 // 全局样式
 import './style.css'
